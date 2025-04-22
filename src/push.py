@@ -8,7 +8,6 @@ Git Subtree 推送功能
 import sys
 import subprocess
 from typing import Dict, List, Optional, Any, Union
-import time # Import time for unique branch name
 
 try:
     from rich.panel import Panel
@@ -30,7 +29,7 @@ from .utils import (
 
 def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
-    推送单个子树的更新到远程 (使用 split -> push 策略)。
+    推送单个子树的更新到远程 (使用 GitPython)
     :param args: 命令行参数
     :param repo_info: 仓库配置信息
     :return: 操作是否成功
@@ -58,56 +57,27 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     prefix = repo_info.get("prefix", "")
     branch = repo_info.get("branch", "main")
     
-    print(f"\n将 {prefix} 的更改推送到 {name} (使用 split 策略)")
+    print(f"\n将 {prefix} 的更改推送到 {name}")
 
-    # 1. Split subtree into a temporary branch
-    # Use a unique temporary branch name to avoid conflicts
-    temp_branch_name = f"subtree_split_{name}_{int(time.time())}"
-    split_cmd_list = ["subtree", "split", f"--prefix={prefix}", "-b", temp_branch_name]
-    print("\n--- 步骤 1: 创建临时分支 (split) ---")
-    split_success, split_output = run_git_command_stream(repo, split_cmd_list)
+    # 构建 git subtree push 命令列表
+    cmd_list = ["subtree", "push", f"--prefix={prefix}", name, branch]
 
-    if not split_success:
-        print(f"\n错误: 'git subtree split' 失败。无法创建临时分支 '{temp_branch_name}'。")
-        # Error details should be printed by run_git_command_stream
-        return False
-    else:
-        # Check if split actually created commits (split_output might contain the new commit hash)
-        if not split_output or "Created commit" not in split_output: # Heuristic check
-             # Sometimes split succeeds but creates no new commits if nothing changed
-             # We might need a more robust check here, e.g., comparing commit hashes
-             # For now, let's try pushing anyway, but warn the user.
-             print(f"警告: 'git subtree split' 可能没有创建新的提交。")
-             # Attempting push anyway...
-             pass # Continue to push step
+    # 显示完整命令
+    cmd_str = " ".join(['git'] + cmd_list)
+    print("\n--- Git Push 命令 ---")
+    print(cmd_str)
+    print("---------------------")
 
-    # 2. Push the temporary branch to the remote target branch
-    # Format: git push <remote> <local_temp_branch>:<remote_target_branch>
-    push_cmd_list = ["push", name, f"{temp_branch_name}:{branch}"]
-    print(f"\n--- 步骤 2: 推送临时分支到远程 '{branch}' 分支 ---")
-    push_success, push_output = run_git_command_stream(repo, push_cmd_list)
+    # 执行命令
+    success, output = run_git_command_stream(repo, cmd_list, show_command=False)
 
-    # 3. Delete the temporary local branch (always try to clean up)
-    delete_cmd_list = ["branch", "-D", temp_branch_name]
-    print(f"\n--- 步骤 3: 删除临时本地分支 '{temp_branch_name}' ---")
-    # Use run_command or run_git_command_stream, show_command=False for cleanup
-    delete_success, delete_output = run_git_command_stream(repo, delete_cmd_list, show_command=False)
-    if not delete_success:
-        # Log cleanup failure but don't necessarily fail the whole operation if push succeeded
-        print(f"警告: 删除临时分支 '{temp_branch_name}' 失败。您可以手动删除: git branch -D {temp_branch_name}")
-        # Print delete_output for debugging if needed
-        # print(delete_output)
-
-    # Final result based on push success
-    if push_success:
+    if success:
         print(f"\n成功将 {prefix} 的更改推送到 {name}!")
         return True
     else:
         print(f"\n推送 {prefix} 的更改到 {name} 失败")
-        print("提示: 请检查上述步骤的输出以获取详细信息。")
-        # Specific hints remain the same
-        print("      如果是权限问题，请确认是否有远程仓库的写入权限。")
-        print("      如果是冲突或非快进问题，可能需要检查远程仓库状态。")
+        print("提示: 如果是权限问题，请确认是否有远程仓库的写入权限")
+        print("      如果是冲突问题，可能需要先拉取远程更新")
         return False
 
 def push_all_subtrees(args=None) -> bool:
