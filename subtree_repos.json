@@ -1,0 +1,12 @@
+{
+  "repos": [
+    {
+      "name": "SubtreeSync",
+      "remote": "https://github.com/HibernalGlow/SubtreeSync.git",
+      "prefix": "src/projects/SubtreeSync",
+      "branch": "main",
+      "added_time": "2025-04-22T10:58:43.745908",
+      "extra": {}
+    }
+  ]
+}
