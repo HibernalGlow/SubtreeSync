@@ -15,13 +15,19 @@ try:
     from rich.prompt import Prompt, Confirm, IntPrompt
     from rich.table import Table
     from rich.syntax import Syntax
+    from rich.console import Console # Import Console
+    
 except ImportError:
     print("请先安装Rich库: pip install rich")
     sys.exit(1)
-
+    
+console = Console()
+import git # Import GitPython
+from .interactive import confirm_action
 from .utils import (
-    console, run_command, validate_git_repo, check_working_tree,
-    load_subtree_repos, save_subtree_repo, extract_repo_name
+    validate_git_repo, check_working_tree,
+    load_subtree_repos, save_subtree_repo, extract_repo_name,
+    get_repo, run_git_command_stream,run_command # Import GitPython helpers
 )
 
 def handle_working_tree_changes() -> bool:
@@ -155,12 +161,13 @@ def add_to_taskfile(prefix: str, remote: str, branch: str) -> bool:
         return False
 
 def add_subtree(args=None) -> bool:
-    """交互式添加git subtree"""
-    console.print(Panel.fit("[bold green]Git Subtree 添加工具", 
-                           border_style="green", 
-                           title="GlowToolBox", 
-                           subtitle="v1.0"))
-    
+    """交互式添加git subtree (使用 GitPython)"""
+    print("\n--- Git Subtree 添加工具 ---")
+
+    repo = get_repo()
+    if not repo:
+        return False # Error printed by get_repo
+
     # 检查是否在git仓库中
     if not validate_git_repo():
         console.print("[bold red]错误:[/] 当前目录不是git仓库。请在git仓库根目录下运行此脚本。")
@@ -247,46 +254,27 @@ def add_subtree(args=None) -> bool:
             console.print("操作已取消", style="yellow")
             return False
     
-    # 添加远程仓库 - 显示完整命令
-    console.print(f"\n[bold blue]添加远程仓库:[/] {repo_name} -> {remote}")
-    add_remote_cmd = ["git", "remote", "add", repo_name, remote]
-    remote_success, remote_output = run_command(add_remote_cmd)
-    
-    if not remote_success:
-        # 检查是否已存在
-        check_remote_cmd = ["git", "remote", "get-url", repo_name]
-        check_success, check_output = run_command(check_remote_cmd)
-        
-        if check_success:
-            console.print(f"远程仓库 '[bold]{repo_name}[/]' 已存在，URL: {check_output.strip()}")
-            if check_output.strip() != remote:
-                console.print(f"[bold yellow]警告:[/] 现有远程仓库URL与您输入的不同!")
-                if Confirm.ask(f"是否更新远程仓库 '{repo_name}' 的URL?"):
-                    update_cmd = ["git", "remote", "set-url", repo_name, remote]
-                    update_success, update_output = run_command(update_cmd)
-                    if update_success:
-                        console.print(f"已更新远程仓库URL", style="green")
-                    else:
-                        console.print(f"[bold red]更新远程仓库URL失败:[/] {update_output}")
-                        return False
+    # --- 添加/更新远程仓库 ---
+    try:
+        existing_remote = next((r for r in repo.remotes if r.name == repo_name), None)
+        if existing_remote:
+            print(f"远程仓库 '{repo_name}' 已存在，更新 URL 为: {remote}")
+            # Update URL using git command via execute, as direct modification can be tricky
+            repo.git.remote('set-url', repo_name, remote)
         else:
-            console.print(f"[bold red]添加远程仓库失败:[/] {remote_output}")
-            return False
-    else:
-        console.print("远程仓库添加成功", style="green")
-    
-    # 执行git subtree add命令 - 显示完整命令
-    console.print(f"\n[bold blue]添加subtree:[/] {prefix} <- {repo_name}/{branch}")
-    cmd = ["git", "subtree", "add", f"--prefix={prefix}", repo_name, branch, "--squash"]
-    
-    # 显示完整命令
-    cmd_str = " ".join(cmd)
-    console.print(Panel(Syntax(cmd_str, "bash", theme="monokai"), 
-                       title="完整Git命令", 
-                       border_style="blue"))
-    
-    success, output = run_command(cmd, show_command=False)  # 已经显示了命令，不需要再显示
-    
+            print(f"添加远程仓库: {repo_name} -> {remote}")
+            repo.create_remote(repo_name, url=remote)
+    except Exception as e:
+        print(f"处理远程仓库 '{repo_name}' 时出错: {e}")
+        return False
+
+    # --- 添加 subtree ---
+    print(f"\n添加subtree: {prefix} <- {repo_name}/{branch}")
+    subtree_cmd_list = ["subtree", "add", f"--prefix={prefix}", repo_name, branch, "--squash"]
+
+    # Use the new streaming function
+    success, output = run_git_command_stream(repo, subtree_cmd_list, show_command=False) # show_command=False because we print manually above
+
     if success:
         console.print("[bold green]Subtree添加成功![/]")
         console.print(Panel(output.strip(), border_style="green", title="命令输出"))
@@ -325,7 +313,7 @@ def add_subtree(args=None) -> bool:
                 if handle_working_tree_changes():
                     # 重试添加subtree
                     console.print(f"\n[bold blue]重试添加subtree:[/] {prefix} <- {repo_name}/{branch}")
-                    retry_success, retry_output = run_command(cmd)
+                    retry_success, retry_output = run_command(subtree_cmd_list)
                     if retry_success:
                         console.print("[bold green]Subtree添加成功![/]")
                         console.print(Panel(retry_output.strip(), border_style="green", title="命令输出"))
