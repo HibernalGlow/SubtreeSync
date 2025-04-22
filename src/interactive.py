@@ -140,3 +140,86 @@ def show_operation_result(success: bool, operation: str, details: str = ""):
         console.print(f"[bold red]{operation}失败[/]")
         if details:
             console.print(f"[red]{details}[/]")
+
+def select_multiple_from_list(title: str, items: List[T], display_func: Callable[[T], str] = str) -> List[T]:
+    """
+    从列表中选择多项
+    
+    Args:
+        title: 选择标题
+        items: 选项列表
+        display_func: 用于将列表项转换为显示文本的函数
+    
+    Returns:
+        选中的项列表，可能为空
+    """
+    if not items:
+        console.print("[yellow]没有可选择的项目[/]")
+        return []
+    
+    # 显示选项列表
+    console.print(Panel(f"[bold green]{title}[/]"), style="green")
+    
+    # 创建美化后的菜单表格
+    table = Table(show_header=True, box=None, border_style="dim")
+    table.add_column("序号", style="cyan bold", justify="center", width=4)
+    table.add_column("仓库名称", style="green bold")
+    table.add_column("本地目录", style="blue")
+    table.add_column("远程地址", style="magenta")
+    
+    for i, item in enumerate(items, 1):
+        if isinstance(item, dict) and 'name' in item and 'prefix' in item:
+            # 针对仓库对象进行丰富展示
+            repo_name = f"[bold]{item['name']}[/]"
+            prefix = f"[blue]{item['prefix']}[/]"
+            remote = item.get('remote', '未知')
+            remote_display = f"[dim]{remote.split('/')[-1]}[/]" if remote != '未知' else "[red]未知[/]"
+            table.add_row(f"{i}", repo_name, prefix, remote_display)
+        else:
+            # 如果不是仓库对象，使用传入的格式化函数
+            table.add_row(f"{i}", display_func(item), "", "")
+    
+    console.print(table)
+    console.print("[bold cyan]提示:[/] 输入多个数字用空格分隔(例如: 1 3 5)，输入[bold]0[/]选择全部，直接回车取消")
+    
+    # 获取用户输入
+    while True:
+        choice = Prompt.ask("请输入选项对应的序号").strip().lower()
+        
+        # 空输入表示取消
+        if not choice:
+            return []
+        
+        # '0' 表示全选
+        if choice == '0':
+            return items.copy()
+        
+        # 否则解析数字
+        try:
+            selected_indices = []
+            for num in choice.split():
+                idx = int(num) - 1
+                if 0 <= idx < len(items):
+                    selected_indices.append(idx)
+                else:
+                    raise ValueError(f"数字 {num} 超出范围")
+            
+            # 排序并去重
+            selected_indices = sorted(set(selected_indices))
+            return [items[i] for i in selected_indices]
+        except ValueError as e:
+            console.print(f"[bold red]错误:[/] 请输入有效的数字 (1-{len(items)}) 或 '0'全选")
+
+def select_repos_for_action(repos: List[Dict[str, Any]], action: str) -> List[Dict[str, Any]]:
+    """
+    为操作选择多个仓库
+    
+    Args:
+        repos: 仓库列表
+        action: 操作名称，用于显示
+    
+    Returns:
+        选中的仓库列表
+    """
+    # 仓库对象已经在select_multiple_from_list中特殊处理，不需要format_repo函数
+    return select_multiple_from_list(f"请选择要{action}的仓库", repos, lambda r: r['name'])

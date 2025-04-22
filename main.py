@@ -86,7 +86,7 @@ python subtree-sync.py list
 
 def run_interactive_mode():
     """运行交互式模式"""
-    from src.interactive import select_mode, select_repo, confirm_action, show_operation_result
+    from src.interactive import select_mode, select_repo, confirm_action, show_operation_result, select_repos_for_action
     from src.utils import load_subtree_repos
     
     while True:
@@ -106,13 +106,26 @@ def run_interactive_mode():
             if not repos:
                 show_operation_result(False, "拉取", "没有配置的子树仓库")
                 continue
-                
-            repo = select_repo(repos, "拉取")
-            if repo is None:
+            
+            # 支持多选仓库
+            selected_repos = select_repos_for_action(repos, "拉取")
+            if not selected_repos:
                 continue
                 
-            args = argparse.Namespace(name=repo["name"], yes=False, interactive=True)
-            result = pull_subtree(args, repo)
+            if len(selected_repos) == 1:
+                # 单个仓库
+                args = argparse.Namespace(name=selected_repos[0]["name"], yes=False, interactive=True)
+                result = pull_subtree(args, selected_repos[0])
+            else:
+                # 多个仓库
+                result = True
+                for repo in selected_repos:
+                    console.print(f"\n[bold cyan]正在拉取:[/] {repo['name']} ({repo['prefix']})")
+                    args = argparse.Namespace(name=repo["name"], yes=True, interactive=True)
+                    sub_result = pull_subtree(args, repo)
+                    if not sub_result:
+                        result = False
+                        
         elif mode == "push":
             from src.push import push_all_subtrees, push_subtree
             repos = load_subtree_repos()
@@ -120,13 +133,26 @@ def run_interactive_mode():
             if not repos:
                 show_operation_result(False, "推送", "没有配置的子树仓库")
                 continue
-                
-            repo = select_repo(repos, "推送")
-            if repo is None:
+            
+            # 支持多选仓库
+            selected_repos = select_repos_for_action(repos, "推送")
+            if not selected_repos:
                 continue
-                
-            args = argparse.Namespace(name=repo["name"], yes=False, check_changes=True, interactive=True)
-            result = push_subtree(args, repo)
+            
+            if len(selected_repos) == 1:
+                # 单个仓库
+                args = argparse.Namespace(name=selected_repos[0]["name"], yes=False, check_changes=True, interactive=True)
+                result = push_subtree(args, selected_repos[0])
+            else:
+                # 多个仓库
+                result = True
+                for repo in selected_repos:
+                    console.print(f"\n[bold cyan]正在推送:[/] {repo['name']} ({repo['prefix']})")
+                    args = argparse.Namespace(name=repo["name"], yes=True, check_changes=True, interactive=True)
+                    sub_result = push_subtree(args, repo)
+                    if not sub_result:
+                        result = False
+                        
         elif mode == "list":
             from src.list import list_subtrees
             args = argparse.Namespace(verbose=True, interactive=True)
