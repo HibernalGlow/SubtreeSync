@@ -9,7 +9,7 @@ import sys
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, Union, Callable
+from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime
 
 try:
@@ -17,7 +17,6 @@ try:
     from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.syntax import Syntax
-    from rich.prompt import IntPrompt, Prompt
 except ImportError:
     print("请先安装Rich库: pip install rich")
     sys.exit(1)
@@ -53,6 +52,50 @@ def load_subtree_repos() -> List[Dict[str, Any]]:
     except Exception as e:
         console.print(f"[bold red]读取配置文件失败:[/] {str(e)}")
         return []
+
+def find_repo_by_name(name: str) -> Optional[Dict[str, Any]]:
+    """
+    根据名称查找仓库配置
+    
+    Args:
+        name: 仓库名称
+        
+    Returns:
+        找到的仓库配置，未找到则返回None
+    """
+    repos = load_subtree_repos()
+    for repo in repos:
+        if repo.get("name") == name:
+            return repo
+    return None
+
+def delete_subtree_repo(name: str) -> bool:
+    """
+    删除subtree仓库配置
+    
+    Args:
+        name: 仓库名称
+        
+    Returns:
+        是否成功删除
+    """
+    repos = load_subtree_repos()
+    initial_count = len(repos)
+    
+    # 过滤掉要删除的仓库
+    repos = [repo for repo in repos if repo.get("name") != name]
+    
+    if len(repos) == initial_count:
+        # 没有找到要删除的仓库
+        return False
+    
+    try:
+        with open(get_config_path(), 'w', encoding='utf-8') as f:
+            json.dump({"repos": repos}, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        console.print(f"[bold red]保存配置文件失败:[/] {str(e)}")
+        return False
 
 def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
     """保存subtree仓库配置"""
@@ -161,6 +204,3 @@ def list_git_remotes() -> List[Dict[str, str]]:
         return remotes
     except Exception:
         return []
-
-def show_numeric_menu(options: List[str], title: str = "请选择一个选项:", default: int = None) -> int:
-    """
