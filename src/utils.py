@@ -253,13 +253,12 @@ def run_git_command_stream(repo: git.Repo, command_list: List[str], show_command
 
     try:
         # 使用 repo.git.execute 获取 Popen 对象
+        # 移除 stdout_as_string 和 stderr_as_string
         process = repo.git.execute(
             command_list, # Pass command list directly
             with_stdout=True, # Needed for stdout piping
             as_process=True,
-            universal_newlines=False, # Get bytes
-            stdout_as_string=False, # Ensure bytes
-            stderr_as_string=False  # Ensure bytes
+            universal_newlines=False # Get bytes
         )
 
         # --- 实时处理 stdout (与 run_command 逻辑相同) ---
