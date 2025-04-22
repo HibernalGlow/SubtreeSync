@@ -11,25 +11,21 @@ import subprocess
 from typing import Dict, List, Optional, Any, Union, Tuple
 
 try:
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Prompt, Confirm
     from rich.table import Table
     from rich.syntax import Syntax
-    from rich.progress import Progress
 except ImportError:
     print("请先安装Rich库: pip install rich")
     sys.exit(1)
 
+from .console import console  # 导入共享的控制台实例
 from .interactive import confirm_action
-from .utils import load_subtree_repos, find_repo_by_name
+from .utils import load_subtree_repos, find_repo_by_name, run_command
 from .split import (
     split_subtree, check_branch_for_prefix, 
     get_split_branch_name, run_git_command  # 复用split.py中的函数
 )
-
-# 创建Rich控制台对象
-console = Console()
 
 def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
@@ -61,7 +57,7 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     # 检查是否需要先执行split操作
     check_split = getattr(args, "check_split", True) if args else True
     if check_split:
-        has_branch, branch_name = check_branch_for_prefix(None, prefix, name)
+        has_branch, branch_name = check_branch_for_prefix(".", prefix, name)
         if not has_branch:
             console.print(f"[yellow]提示:[/] 检测到{prefix}可能没有对应的split分支，需要先执行split操作")
             if not args or not getattr(args, "yes", False):
@@ -90,8 +86,9 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(cmd_str)
     console.print("[bold yellow]---------------------[/]")
 
-    # 执行命令
-    success, output = run_git_command(cmd_list, True)
+    # 执行命令，使用run_command来获取实时输出
+    full_cmd = ["git"] + cmd_list
+    success, output = run_command(full_cmd)
 
     if success:
         console.print(f"\n[bold green]成功将 {prefix} 的更改推送到 {name}![/]")
@@ -101,7 +98,9 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
         console.print("[yellow]提示:[/] 如果是权限问题，请确认是否有远程仓库的写入权限")
         console.print("      如果是冲突问题，可能需要先拉取远程更新")
         console.print("      如果看到'找不到远程ref对应的本地ref'错误，可能需要重新执行split操作，使用--force-split参数")
-        console.print(f"[yellow]错误信息:[/] {output}")
+        if output:
+            print("\n错误信息:")
+            print(output)
         return False
 
 def push_all_subtrees(args=None) -> bool:

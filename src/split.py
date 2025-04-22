@@ -9,29 +9,49 @@ import sys
 import os
 import subprocess
 import datetime
+import tempfile
 from typing import Dict, List, Optional, Any, Union, Tuple
 
 try:
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Prompt, Confirm
     from rich.table import Table
     from rich.syntax import Syntax
-    from rich.progress import Progress
 except ImportError:
     print("请先安装Rich库: pip install rich")
     sys.exit(1)
 
-import git  # Import GitPython
+try:
+    import pyperclip  # 用于复制内容到剪贴板
+except ImportError:
+    pyperclip = None
+
+from .console import console  # 导入共享的控制台实例
 from .interactive import confirm_action
 from .utils import (
     validate_git_repo, check_working_tree,
-    load_subtree_repos,
-    get_repo, run_git_command_stream
+    load_subtree_repos, find_repo_by_name,
+    run_git_command_stream, run_command
 )
 
-# 创建Rich控制台对象
-console = Console()
+def copy_to_clipboard(text: str) -> bool:
+    """
+    复制文本到剪贴板
+    
+    :param text: 要复制的文本
+    :return: 是否成功复制
+    """
+    if pyperclip is None:
+        console.print("[bold yellow]警告:[/] 未安装pyperclip库，无法使用剪贴板功能")
+        console.print("[dim]可以通过运行 'pip install pyperclip' 安装[/]")
+        return False
+    
+    try:
+        pyperclip.copy(text)
+        return True
+    except Exception as e:
+        console.print(f"[bold red]复制到剪贴板时出错:[/] {str(e)}")
+        return False
 
 def get_split_branch_name(repo_name: str) -> str:
     """
@@ -51,46 +71,31 @@ def run_git_command(cmd_args: List[str], show_output: bool = False) -> Tuple[boo
     :param show_output: 是否显示输出
     :return: (成功与否, 输出内容)
     """
-    try:
-        full_cmd = ["git"] + cmd_args
-        if show_output:
-            console.print(f"[dim]执行命令: {' '.join(full_cmd)}[/]")
-        
-        # 执行命令并捕获输出
-        process = subprocess.run(
-            full_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            errors='replace'
-        )
-        
-        # 合并标准输出和错误输出
-        output = process.stdout
-        error = process.stderr
-        
-        # 检查执行状态
-        if process.returncode != 0:
-            if show_output:
-                console.print(f"[bold red]命令执行失败:[/] {error}")
-            return False, error
-            
-        if show_output and output:
-            console.print(output)
-            
-        return True, output
-    except Exception as e:
-        error_msg = str(e)
-        if show_output:
-            console.print(f"[bold red]执行命令时出错:[/] {error_msg}")
-        return False, error_msg
+    full_cmd = ["git"] + cmd_args
+    
+    if not show_output:
+        # 对于不需要显示输出的命令，使用简单的subprocess.run
+        try:
+            process = subprocess.run(
+                full_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            return process.returncode == 0, process.stdout + (f"\n{process.stderr}" if process.stderr else "")
+        except Exception as e:
+            return False, str(e)
+    
+    # 对于需要显示输出的命令，使用实时输出的方式
+    return run_command(full_cmd)
 
-def check_branch_for_prefix(repo, prefix: str, repo_name: str) -> Tuple[bool, Optional[str]]:
+def check_branch_for_prefix(repo_dir: str, prefix: str, repo_name: str) -> Tuple[bool, Optional[str]]:
     """
     检查指定前缀是否已经有对应的分支
     
-    :param repo: GitPython库的仓库对象（不再使用）
+    :param repo_dir: Git仓库目录
     :param prefix: 子树前缀路径
     :param repo_name: 仓库名称，用于生成分支名
     :return: (是否有对应分支, 分支名称或None)
@@ -126,6 +131,27 @@ def check_branch_for_prefix(repo, prefix: str, repo_name: str) -> Tuple[bool, Op
         console.print(f"[bold red]检查分支时出错:[/] {str(e)}")
         return False, split_branch_name
 
+def run_command_or_copy(cmd: List[str], cmd_str: str, copy_only: bool = False) -> Tuple[bool, str]:
+    """
+    执行命令或复制命令到剪贴板
+    
+    :param cmd: 命令参数列表
+    :param cmd_str: 命令完整字符串，用于复制
+    :param copy_only: 是否只复制不执行
+    :return: (是否成功, 输出信息)
+    """
+    if copy_only:
+        if copy_to_clipboard(cmd_str):
+            console.print("[bold green]命令已复制到剪贴板！[/] 您可以自行粘贴并执行")
+            return True, "命令已复制到剪贴板"
+        else:
+            console.print("[bold red]复制命令到剪贴板失败[/]")
+            if not Confirm.ask("是否继续执行命令?"):
+                return False, "操作已取消"
+    
+    # 执行命令
+    return run_git_command(cmd, True)
+
 def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
     为单个子树执行split操作，分离成独立分支
@@ -141,7 +167,6 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
             return False
             
         # 尝试通过名称查找仓库信息
-        from .utils import find_repo_by_name
         repo_name = args.name
         repo_info = find_repo_by_name(repo_name)
         if not repo_info:
@@ -157,7 +182,7 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(f"\n[bold cyan]正在为 {prefix} 执行 split 操作[/]")
     
     # 检查是否已经有对应分支
-    has_branch, branch_name = check_branch_for_prefix(None, prefix, name)
+    has_branch, branch_name = check_branch_for_prefix(".", prefix, name)
     
     # 即使有分支，我们也执行split以确保最新变更被分离出来
     # 构建 git subtree split 命令列表
@@ -169,8 +194,9 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(cmd_str)
     console.print("[bold yellow]------------------------[/]")
 
-    # 执行命令
-    success, output = run_git_command(cmd_list, True)
+    # 检查是否只复制命令而不执行
+    copy_only = getattr(args, "copy_only", False) if args else False
+    success, output = run_command_or_copy(cmd_list, cmd_str, copy_only)
 
     if success:
         console.print(f"\n[bold green]成功为 {prefix} 执行 split 操作![/] 分支: {split_branch}")
@@ -178,7 +204,9 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     else:
         console.print(f"\n[bold red]为 {prefix} 执行 split 操作失败[/]")
         console.print("[yellow]提示:[/] 可能原因包括子树目录不存在或Git权限问题")
-        console.print(f"[yellow]错误信息:[/] {output}")
+        if output:
+            print("\n错误信息:")
+            print(output)
         return False
 
 def split_all_subtrees(args=None) -> bool:
@@ -244,20 +272,62 @@ def split_all_subtrees(args=None) -> bool:
             console.print("[yellow]操作已取消[/]")
             return False
     
+    # 检查是否只复制命令
+    copy_only = getattr(args, "copy_only", False) if args else False
+    if copy_only and not pyperclip:
+        console.print("[bold yellow]警告:[/] 复制到剪贴板功能需要pyperclip库，但未安装")
+        console.print("[yellow]提示:[/] 可以通过运行 'pip install pyperclip' 安装")
+        if Confirm.ask("是否继续并直接执行命令?"):
+            copy_only = False
+        else:
+            console.print("[yellow]操作已取消[/]")
+            return False
+    
     # 执行split操作
     success_count = 0
     fail_count = 0
     
     for repo in selected_repos:
-        if split_subtree(args, repo):
-            success_count += 1
+        # 如果是批量模式且需要复制到剪贴板，我们只复制第一个命令
+        if copy_only and len(selected_repos) > 1:
+            if success_count == 0:
+                console.print("[bold yellow]由于选择了多个仓库且启用了复制模式，只有第一个命令会被复制到剪贴板[/]")
+        
+        # 传递copy_only参数到split_subtree函数
+        if copy_only:
+            # 创建临时参数对象，带有copy_only和name属性
+            class TempArgs:
+                pass
+            temp_args = TempArgs()
+            temp_args.copy_only = True
+            temp_args.name = repo.get("name", "")
+            temp_args.yes = True
+            
+            if split_subtree(temp_args, repo):
+                success_count += 1
+            else:
+                fail_count += 1
+            
+            # 复制后只处理第一个仓库
+            if len(selected_repos) > 1:
+                console.print("[bold yellow]由于您选择了复制模式，其余仓库命令需要手动生成[/]")
+                break
         else:
-            fail_count += 1
+            # 正常执行
+            if split_subtree(args, repo):
+                success_count += 1
+            else:
+                fail_count += 1
     
     # 打印操作结果摘要
     console.print("\n[bold cyan]===操作结果摘要===[/]")
-    console.print(f"• 总共尝试split: {len(selected_repos)} 个仓库")
-    console.print(f"• 成功: {success_count} 个仓库")
+    if copy_only:
+        console.print(f"• 总共生成命令: {success_count} 个仓库")
+        console.print(f"• 成功复制到剪贴板: {success_count} 个命令")
+    else:
+        console.print(f"• 总共尝试split: {len(selected_repos)} 个仓库")
+        console.print(f"• 成功: {success_count} 个仓库")
+    
     if fail_count > 0:
         console.print(f"• 失败: {fail_count} 个仓库")
     
