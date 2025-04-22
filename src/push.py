@@ -27,7 +27,7 @@ from .utils import (
     load_subtree_repos,
     get_repo, run_git_command_stream # Import GitPython helpers
 )
-from .split import split_subtree, check_branch_for_prefix  # 导入新增的split功能
+from .split import split_subtree, check_branch_for_prefix, get_split_branch_name  # 导入新增的split功能
 
 # 创建Rich控制台对象
 console = Console()
@@ -61,15 +61,13 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     remote = repo_info.get("remote", "")
     prefix = repo_info.get("prefix", "")
     branch = repo_info.get("branch", "main")
-    # 使用单独的split_branch，如果未设置则生成默认值
-    split_branch = repo_info.get("split_branch", f"subtree-split-{name}")
     
     console.print(f"\n将 {prefix} 的更改推送到 {name}")
     
     # 检查是否需要先执行split操作
     check_split = getattr(args, "check_split", True) if args else True
     if check_split:
-        has_branch, _ = check_branch_for_prefix(repo, prefix, split_branch)
+        has_branch, branch_name = check_branch_for_prefix(repo, prefix, name)
         if not has_branch:
             console.print(f"[yellow]提示:[/] 检测到{prefix}可能没有对应的split分支，需要先执行split操作")
             if not args or not getattr(args, "yes", False):
@@ -148,12 +146,13 @@ def push_all_subtrees(args=None) -> bool:
     table.add_column("本地路径", style="yellow")
     
     for i, repo in enumerate(repos):
+        repo_name = repo.get("name", "")
         table.add_row(
             str(i + 1),
-            repo.get("name", ""),
+            repo_name,
             repo.get("remote", ""),
             repo.get("branch", "main"),
-            repo.get("split_branch", f"subtree-split-{repo.get('name', '')}"),
+            get_split_branch_name(repo_name),
             repo.get("prefix", "")
         )
     

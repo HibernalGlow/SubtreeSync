@@ -7,6 +7,7 @@ Git Subtree Split功能
 
 import sys
 import subprocess
+import datetime
 from typing import Dict, List, Optional, Any, Union, Tuple
 
 try:
@@ -31,35 +32,54 @@ from .utils import (
 # 创建Rich控制台对象
 console = Console()
 
-def check_branch_for_prefix(repo, prefix: str, split_branch_name: str) -> Tuple[bool, Optional[str]]:
+def get_split_branch_name(repo_name: str) -> str:
+    """
+    根据仓库名生成split分支名，格式为"仓库名#ST日期"
+    
+    :param repo_name: 仓库名称
+    :return: 生成的分支名
+    """
+    today = datetime.datetime.now().strftime("%y%m%d")
+    return f"{repo_name}#ST{today}"
+
+def check_branch_for_prefix(repo, prefix: str, repo_name: str) -> Tuple[bool, Optional[str]]:
     """
     检查指定前缀是否已经有对应的分支
     
     :param repo: GitPython库的仓库对象
     :param prefix: 子树前缀路径
-    :param split_branch_name: Split目标分支名称
+    :param repo_name: 仓库名称，用于生成分支名
     :return: (是否有对应分支, 分支名称或None)
     """
+    # 根据仓库名和当前日期生成分支名
+    split_branch_name = get_split_branch_name(repo_name)
+    
     # 尝试查找前缀对应的分支
     try:
         # 检查本地是否已存在对应分支
         for branch in repo.branches:
             if branch.name == split_branch_name:
                 return True, split_branch_name
+            # 检查是否有以仓库名#ST开头的分支（即早期的split分支）
+            elif branch.name.startswith(f"{repo_name}#ST"):
+                return True, branch.name
                 
         # 使用git命令查找是否有带subtree-split注释的提交
         # 这里我们执行一个git命令来查找subtree相关的提交
         cmd = ["log", "--grep=git-subtree-dir", f"--grep={prefix}", "--pretty=format:%H"]
-        output = repo.git.execute(cmd)
-        
-        # 如果找到了相关提交，说明曾经进行过split
-        if output.strip():
-            return True, split_branch_name
+        try:
+            output = repo.git.execute(cmd)
             
-        return False, None
+            # 如果找到了相关提交，说明曾经进行过split
+            if output.strip():
+                return True, split_branch_name
+        except Exception as e:
+            console.print(f"[bold yellow]警告:[/] 执行git log查找时出错: {str(e)}")
+            
+        return False, split_branch_name
     except Exception as e:
         console.print(f"[bold red]检查分支时出错:[/] {str(e)}")
-        return False, None
+        return False, split_branch_name
 
 def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
@@ -89,13 +109,14 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     
     name = repo_info.get("name", "")
     prefix = repo_info.get("prefix", "")
-    # 使用单独的split_branch，如果未设置则生成默认值
-    split_branch = repo_info.get("split_branch", f"subtree-split-{name}")
+    
+    # 使用新命名规则生成分支名
+    split_branch = get_split_branch_name(name)
     
     console.print(f"\n[bold cyan]正在为 {prefix} 执行 split 操作[/]")
     
     # 检查是否已经有对应分支
-    has_branch, _ = check_branch_for_prefix(repo, prefix, split_branch)
+    has_branch, branch_name = check_branch_for_prefix(repo, prefix, name)
     
     # 即使有分支，我们也执行split以确保最新变更被分离出来
     # 构建 git subtree split 命令列表
@@ -154,10 +175,12 @@ def split_all_subtrees(args=None) -> bool:
     table.add_column("本地路径", style="yellow")
     
     for i, repo in enumerate(repos):
+        repo_name = repo.get("name", "")
+        split_branch = get_split_branch_name(repo_name)
         table.add_row(
             str(i + 1),
-            repo.get("name", ""),
-            repo.get("split_branch", f"subtree-split-{repo.get('name', '')}"),
+            repo_name,
+            split_branch,
             repo.get("prefix", "")
         )
     
