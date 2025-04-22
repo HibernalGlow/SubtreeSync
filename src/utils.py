@@ -222,7 +222,7 @@ _repo_cache = None
 def get_repo() -> Optional[git.Repo]:
     """获取当前目录的 GitPython Repo 对象，带缓存"""
     global _repo_cache
-    if _repo_cache:
+    if (_repo_cache):
         return _repo_cache
     try:
         repo = git.Repo(search_parent_directories=True)
@@ -237,14 +237,17 @@ def get_repo() -> Optional[git.Repo]:
 
 def run_git_command_stream(repo: git.Repo, command_list: List[str], show_command: bool = True) -> Tuple[bool, str]:
     """
-    使用 GitPython 执行 Git 命令并实时流式输出结果。
-    :param repo: GitPython Repo 对象
-    :param command_list: 命令列表 (例如 ['subtree', 'pull', ...])
+    使用 subprocess.Popen 执行 Git 命令并实时流式输出结果, 在正确的仓库目录执行。
+    :param repo: GitPython Repo 对象 (用于获取工作目录)
+    :param command_list: Git 子命令列表 (例如 ['subtree', 'pull', ...])
     :param show_command: 是否显示执行的命令
     :return: (成功标志, 完整输出结果)
     """
+    # Prepend 'git' to the command list for execution
+    full_cmd = ['git'] + command_list
     if show_command:
-        cmd_str = " ".join(['git'] + command_list) # Prepend 'git' for display
+        cmd_str = " ".join(full_cmd)
+        # Use print for simplicity here, as console might be problematic
         print(f"$ {cmd_str}")
 
     full_stdout = ""
@@ -252,13 +255,13 @@ def run_git_command_stream(repo: git.Repo, command_list: List[str], show_command
     process = None
 
     try:
-        # 使用 repo.git.execute 获取 Popen 对象
-        # 移除 stdout_as_string 和 stderr_as_string
-        process = repo.git.execute(
-            command_list, # Pass command list directly
-            with_stdout=True, # Needed for stdout piping
-            as_process=True,
-            universal_newlines=False # Get bytes
+        # Use subprocess.Popen directly, setting the working directory
+        process = subprocess.Popen(
+            full_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=repo.working_dir, # Execute in the repository's working directory
+            universal_newlines=False # Ensure bytes
         )
 
         # --- 实时处理 stdout (与 run_command 逻辑相同) ---
@@ -302,23 +305,21 @@ def run_git_command_stream(repo: git.Repo, command_list: List[str], show_command
         output = full_stdout + full_stderr
         return return_code == 0, output.strip()
 
+    # Keep GitCommandError for potential future use if switching back
     except git.GitCommandError as e:
-        # GitPython specific error
         print(f"Git 命令执行失败: {e.command}")
         print(f"返回码: {e.status}")
-        # Try to decode stderr from the exception if available
         stderr_output = e.stderr.decode('utf-8', errors='replace') if isinstance(e.stderr, bytes) else str(e.stderr)
         print(f"错误输出:\n{stderr_output}")
         return False, stderr_output
     except FileNotFoundError:
-        # This might happen if 'git' itself is not found, though less likely via GitPython
-        error_msg = f"错误: 命令或程序 'git' 未找到。"
-        print(error_msg)
+        # This error now correctly refers to 'git' if it's not found
+        error_msg = f"错误: 命令或程序 '{full_cmd[0]}' 未找到。请确保 Git 已安装并在系统 PATH 中。"
+        print(error_msg) # Use print
         return False, error_msg
     except Exception as e:
         error_msg = f"执行 Git 命令时发生意外错误: {str(e)}"
-        print(error_msg)
-        # Cleanup process streams if Popen object was created
+        print(error_msg) # Use print
         if process and process.stdout: process.stdout.close()
         if process and process.stderr: process.stderr.close()
         return False, error_msg
