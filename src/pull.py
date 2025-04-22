@@ -61,27 +61,15 @@ def pull_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
                        title="Git Pull 命令", 
                        border_style="blue"))
     
-    success, output = run_command(cmd)
+    # 执行命令，结果会直接显示在控制台
+    success, _ = run_command(cmd)
     
     if success:
         console.print(f"[bold green]从 {name} 成功拉取更新![/]")
-        console.print(Panel(output.strip(), border_style="green", title="命令输出"))
-        
-        # 检查是否有更改
-        if "Already up to date" in output:
-            console.print(f"[yellow]提示:[/] {prefix} 目录已是最新状态，无需更新")
-        
         return True
     else:
-        console.print(f"[bold red]从 {name} 拉取更新失败:[/]")
-        console.print(Panel(output.strip(), border_style="red", title="错误输出"))
-        
-        # 检查是否因为冲突而失败
-        if "conflict" in output.lower():
-            console.print("[bold yellow]原因:[/] 拉取过程中出现冲突，请手动解决冲突")
-            console.print("[cyan]提示:[/] 可以使用以下命令查看冲突文件:")
-            console.print("[dim]    $ git status[/]")
-        
+        console.print(f"[bold red]从 {name} 拉取更新失败[/]")
+        console.print("[cyan]提示:[/] 如果出现冲突，请手动解决后再继续")
         return False
 
 def pull_all_subtrees(args=None) -> bool:

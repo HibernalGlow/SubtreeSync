@@ -86,25 +86,16 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
                        title="Git Push 命令", 
                        border_style="blue"))
     
-    success, output = run_command(cmd)
+    # 执行命令，结果会直接显示在控制台
+    success, _ = run_command(cmd)
     
     if success:
         console.print(f"[bold green]成功将 {prefix} 的更改推送到 {name}![/]")
-        console.print(Panel(output.strip(), border_style="green", title="命令输出"))
         return True
     else:
-        console.print(f"[bold red]推送 {prefix} 的更改到 {name} 失败:[/]")
-        console.print(Panel(output.strip(), border_style="red", title="错误输出"))
-        
-        # 检查是否是由于授权问题
-        if "permission denied" in output.lower() or "authentication failed" in output.lower():
-            console.print("[bold yellow]原因:[/] 推送失败可能是由于权限或认证问题")
-            console.print("[cyan]提示:[/] 请确认您有该远程仓库的写入权限，并且已正确配置SSH密钥或凭据。")
-        # 检查是否是由于分支冲突
-        elif "non-fast-forward" in output.lower():
-            console.print("[bold yellow]原因:[/] 推送被拒绝，因为远程分支包含您本地没有的工作")
-            console.print("[cyan]提示:[/] 请先拉取远程更新再尝试推送: git subtree pull --prefix={prefix} {name} {branch} --squash")
-        
+        console.print(f"[bold red]推送 {prefix} 的更改到 {name} 失败[/]")
+        console.print("[cyan]提示:[/] 如果是权限问题，请确认是否有远程仓库的写入权限")
+        console.print("       如果是冲突问题，可能需要先拉取远程更新")
         return False
 
 def push_all_subtrees(args=None) -> bool:
