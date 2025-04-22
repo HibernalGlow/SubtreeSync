@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime
+import io # Import io module
 
 try:
     from rich.console import Console
@@ -121,7 +122,7 @@ def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
 
 def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     """
-    执行命令并返回结果，逐行读取字节流并强制UTF-8解码。
+    执行命令并返回结果，强制UTF-8并处理环境。
     :param cmd: 命令列表
     :param show_command: 是否显示执行的命令
     :return: (成功标志, 输出结果)
@@ -129,69 +130,61 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     if show_command:
         cmd_str = " ".join(cmd)
         console.print(f"[dim]$ {cmd_str}[/]")
-
-    full_stdout = ""
-    full_stderr = ""
-    process = None  # Initialize process to None
-
+    
     try:
-        # 使用 Popen，不指定 text 或 encoding，获取字节流
+        # 不使用进度条，直接实时显示输出
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            bufsize=1,  # 行缓冲
+            text=True,
+            encoding='utf-8',  # 明确指定使用UTF-8编码
+            errors='replace'  # 遇到解码错误时替换为占位符，而不是抛出异常
         )
+        
+        # 实时输出命令执行结果
+        all_output = []
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                console.print(output.rstrip())
+                all_output.append(output)
+        
+        # 收集错误输出
+        err_output = process.stderr.read()
+        if err_output:
+            console.print("[red]" + err_output + "[/]")
+            all_output.append(err_output)
+        
+        # 等待进程结束并获取返回码
+        return_code = process.poll()
+        
+        # 组合所有输出
+        complete_output = ''.join(all_output)
+        
+        # 手动解码 stdout 和 stderr 字节流
+        stdout_str = complete_output.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        stderr_str = err_output.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
 
-        # 实时读取标准输出字节流并解码打印
-        if process.stdout:
-            for line_bytes in iter(process.stdout.readline, b''):
-                line_str = line_bytes.decode('utf-8', errors='replace').rstrip()
-                console.print(line_str)
-                full_stdout += line_str + "\n"
-            process.stdout.close() # Ensure stdout is closed
+        # 打印解码后的输出，禁用markup解析
+        if stdout_str:
+            # 使用 io.StringIO 模拟文件流，让 rich 处理换行符等
+            with io.StringIO(stdout_str) as f:
+                for line in f:
+                    console.print(line, end="", markup=False) # 禁用markup
+        if stderr_str:
+            with io.StringIO(stderr_str) as f:
+                for line in f:
+                    console.print(f"[red]{line}[/]", end="", markup=False) # 禁用markup
 
-        # 读取标准错误字节流并解码打印
-        if process.stderr:
-            stderr_bytes = process.stderr.read()
-            stderr_str = stderr_bytes.decode('utf-8', errors='replace')
-            if stderr_str:
-                console.print(f"[red]{stderr_str}[/]")
-                full_stderr += stderr_str
-            process.stderr.close() # Ensure stderr is closed
-
-        # 等待进程结束
-        process.wait()
-        return_code = process.returncode
-
-        # 合并输出
-        output = full_stdout + full_stderr
+        # 合并输出用于返回
+        output = stdout_str + stderr_str
 
         return return_code == 0, output.strip()
-
-    except FileNotFoundError:
-        error_msg = f"错误: 命令或程序 '{cmd[0]}' 未找到。请确保它在系统PATH中。"
-        console.print(f"[bold red]{error_msg}[/]")
-        return False, error_msg
     except Exception as e:
-        error_msg = f"命令执行时发生意外错误: {str(e)}"
-        console.print(f"[bold red]{error_msg}[/]")
-        # Ensure process streams are closed if an error occurs after Popen
-        if process and process.stdout:
-            process.stdout.close()
-        if process and process.stderr:
-            process.stderr.close()
-        return False, error_msg
-    finally:
-        # Ensure process is terminated if it's still running
-        if process and process.poll() is None:
-            try:
-                process.terminate()
-                process.wait(timeout=1) # Give it a second to terminate
-            except subprocess.TimeoutExpired:
-                process.kill() # Force kill if terminate doesn't work
-            except Exception:
-                pass # Ignore errors during cleanup
+        return False, str(e)
 
 def validate_git_repo() -> bool:
     """检查当前是否在git仓库中"""

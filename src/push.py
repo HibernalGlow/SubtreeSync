@@ -72,10 +72,10 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(f"\n[bold blue]将 {prefix} 的更改推送到 {name}[/]")
     
     # 如果指定了检查更改选项，先检查是否有更改要推送
-    if args and getattr(args, "check_changes", False):
-        if not has_local_changes(prefix):
-            console.print(f"[yellow]提示:[/] {prefix} 目录没有检测到需要推送的更改，跳过")
-            return True
+    # if args and getattr(args, "check_changes", False):
+    #     if not has_local_changes(prefix):
+    #         console.print(f"[yellow]提示:[/] {prefix} 目录没有检测到需要推送的更改，跳过")
+    #         return True
     
     # 构建 git subtree push 命令
     cmd = ["git", "subtree", "push", f"--prefix={prefix}", name, branch]
