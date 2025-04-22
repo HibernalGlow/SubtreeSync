@@ -121,7 +121,7 @@ def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
 
 def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     """
-    执行命令并返回结果
+    执行命令并返回结果，强制使用UTF-8解码并替换错误。
     :param cmd: 命令列表
     :param show_command: 是否显示执行的命令
     :return: (成功标志, 输出结果)
@@ -131,31 +131,38 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
         console.print(f"[dim]$ {cmd_str}[/]")
     
     try:
-        # 直接使用subprocess.run，避免线程相关的问题
-        result = subprocess.run(
+        # 运行命令，捕获原始字节输出
+        process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            encoding='utf-8',       # 明确使用UTF-8编码
-            errors='replace',       # 遇到解码错误时替换为Unicode替代字符
-            text=True,              # 返回文本而不是字节
-            check=False             # 不要因为非零返回码而抛出异常
+            # 不设置 text=True 或 encoding，直接处理字节
         )
         
-        # 输出标准输出
-        if result.stdout:
-            console.print(result.stdout)
-            
-        # 输出标准错误
-        if result.stderr:
-            console.print("[red]" + result.stderr + "[/]")
+        stdout_bytes, stderr_bytes = process.communicate()
+        return_code = process.returncode
         
+        # 手动解码为UTF-8，替换无法解码的字节
+        stdout_str = stdout_bytes.decode('utf-8', errors='replace')
+        stderr_str = stderr_bytes.decode('utf-8', errors='replace')
+        
+        # 输出解码后的字符串
+        if stdout_str:
+            console.print(stdout_str)
+        if stderr_str:
+            console.print(f"[red]{stderr_str}[/]")
+            
         # 合并输出用于返回
-        output = result.stdout + result.stderr if result.stderr else result.stdout
-        return result.returncode == 0, output
-    
+        output = stdout_str + stderr_str
+        
+        return return_code == 0, output
+        
+    except FileNotFoundError:
+        error_msg = f"错误: 命令或程序 '{cmd[0]}' 未找到。请确保它在系统PATH中。"
+        console.print(f"[bold red]{error_msg}[/]")
+        return False, error_msg
     except Exception as e:
-        error_msg = f"命令执行失败: {str(e)}"
+        error_msg = f"命令执行时发生意外错误: {str(e)}"
         console.print(f"[bold red]{error_msg}[/]")
         return False, error_msg
 
