@@ -6,6 +6,7 @@ Git Subtree Split功能
 """
 
 import sys
+import os
 import subprocess
 import datetime
 from typing import Dict, List, Optional, Any, Union, Tuple
@@ -42,11 +43,54 @@ def get_split_branch_name(repo_name: str) -> str:
     today = datetime.datetime.now().strftime("%y%m%d")
     return f"{repo_name}#ST{today}"
 
+def run_git_command(cmd_args: List[str], show_output: bool = False) -> Tuple[bool, str]:
+    """
+    使用子进程执行Git命令
+    
+    :param cmd_args: Git命令参数列表
+    :param show_output: 是否显示输出
+    :return: (成功与否, 输出内容)
+    """
+    try:
+        full_cmd = ["git"] + cmd_args
+        if show_output:
+            console.print(f"[dim]执行命令: {' '.join(full_cmd)}[/]")
+        
+        # 执行命令并捕获输出
+        process = subprocess.run(
+            full_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        # 合并标准输出和错误输出
+        output = process.stdout
+        error = process.stderr
+        
+        # 检查执行状态
+        if process.returncode != 0:
+            if show_output:
+                console.print(f"[bold red]命令执行失败:[/] {error}")
+            return False, error
+            
+        if show_output and output:
+            console.print(output)
+            
+        return True, output
+    except Exception as e:
+        error_msg = str(e)
+        if show_output:
+            console.print(f"[bold red]执行命令时出错:[/] {error_msg}")
+        return False, error_msg
+
 def check_branch_for_prefix(repo, prefix: str, repo_name: str) -> Tuple[bool, Optional[str]]:
     """
     检查指定前缀是否已经有对应的分支
     
-    :param repo: GitPython库的仓库对象
+    :param repo: GitPython库的仓库对象（不再使用）
     :param prefix: 子树前缀路径
     :param repo_name: 仓库名称，用于生成分支名
     :return: (是否有对应分支, 分支名称或None)
@@ -57,25 +101,26 @@ def check_branch_for_prefix(repo, prefix: str, repo_name: str) -> Tuple[bool, Op
     # 尝试查找前缀对应的分支
     try:
         # 检查本地是否已存在对应分支
-        for branch in repo.branches:
-            if branch.name == split_branch_name:
-                return True, split_branch_name
-            # 检查是否有以仓库名#ST开头的分支（即早期的split分支）
-            elif branch.name.startswith(f"{repo_name}#ST"):
-                return True, branch.name
-                
+        success, output = run_git_command(["branch"], False)
+        if success:
+            branches = [b.strip() for b in output.split('\n') if b.strip()]
+            for branch in branches:
+                # 移除分支名称前的'*'和空格
+                clean_name = branch.replace('*', '').strip()
+                if clean_name == split_branch_name:
+                    return True, split_branch_name
+                # 检查是否有以仓库名#ST开头的分支（即早期的split分支）
+                elif clean_name.startswith(f"{repo_name}#ST"):
+                    return True, clean_name
+        
         # 使用git命令查找是否有带subtree-split注释的提交
-        # 这里我们执行一个git命令来查找subtree相关的提交
         cmd = ["log", "--grep=git-subtree-dir", f"--grep={prefix}", "--pretty=format:%H"]
-        try:
-            output = repo.git.execute(cmd)
-            
-            # 如果找到了相关提交，说明曾经进行过split
-            if output.strip():
-                return True, split_branch_name
-        except Exception as e:
-            console.print(f"[bold yellow]警告:[/] 执行git log查找时出错: {str(e)}")
-            
+        success, output = run_git_command(cmd, False)
+        
+        # 如果找到了相关提交，说明曾经进行过split
+        if success and output.strip():
+            return True, split_branch_name
+        
         return False, split_branch_name
     except Exception as e:
         console.print(f"[bold red]检查分支时出错:[/] {str(e)}")
@@ -83,16 +128,12 @@ def check_branch_for_prefix(repo, prefix: str, repo_name: str) -> Tuple[bool, Op
 
 def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
-    为单个子树执行split操作，分离成独立分支 (使用 GitPython)
+    为单个子树执行split操作，分离成独立分支
     
     :param args: 命令行参数
     :param repo_info: 仓库配置信息
     :return: 操作是否成功
     """
-    repo = get_repo()
-    if not repo:
-        return False  # Error printed by get_repo
-
     # 确保repo_info是有效的
     if not repo_info:
         if not args or not getattr(args, "name", None):
@@ -116,7 +157,7 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(f"\n[bold cyan]正在为 {prefix} 执行 split 操作[/]")
     
     # 检查是否已经有对应分支
-    has_branch, branch_name = check_branch_for_prefix(repo, prefix, name)
+    has_branch, branch_name = check_branch_for_prefix(None, prefix, name)
     
     # 即使有分支，我们也执行split以确保最新变更被分离出来
     # 构建 git subtree split 命令列表
@@ -129,7 +170,7 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print("[bold yellow]------------------------[/]")
 
     # 执行命令
-    success, output = run_git_command_stream(repo, cmd_list, show_command=False)
+    success, output = run_git_command(cmd_list, True)
 
     if success:
         console.print(f"\n[bold green]成功为 {prefix} 执行 split 操作![/] 分支: {split_branch}")
@@ -137,11 +178,12 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     else:
         console.print(f"\n[bold red]为 {prefix} 执行 split 操作失败[/]")
         console.print("[yellow]提示:[/] 可能原因包括子树目录不存在或Git权限问题")
+        console.print(f"[yellow]错误信息:[/] {output}")
         return False
 
 def split_all_subtrees(args=None) -> bool:
     """
-    交互式为所有子树执行split操作 (使用 GitPython)
+    交互式为所有子树执行split操作
     
     :param args: 命令行参数
     :return: 操作是否成功
@@ -149,12 +191,14 @@ def split_all_subtrees(args=None) -> bool:
     console.print("\n[bold cyan]--- Git Subtree Split 工具 ---[/]")
     
     # 检查是否在git仓库中
-    if not validate_git_repo():
+    success, _ = run_git_command(["rev-parse", "--is-inside-work-tree"], False)
+    if not success:
         console.print("[bold red]错误:[/] 当前目录不是git仓库。请在git仓库根目录下运行此脚本。")
         return False
     
     # 检查工作区是否有未提交的更改
-    if check_working_tree():
+    success, output = run_git_command(["status", "--porcelain"], False)
+    if success and output.strip():
         console.print("[bold yellow]警告:[/] 检测到工作区有未提交的更改。在执行split之前，请先提交这些更改。")
         console.print("[yellow]提示:[/] 使用 'git add .' 和 'git commit' 来提交更改")
         return False

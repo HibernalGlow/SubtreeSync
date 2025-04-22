@@ -6,8 +6,9 @@ Git Subtree 推送功能
 """
 
 import sys
+import os
 import subprocess
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Tuple
 
 try:
     from rich.console import Console
@@ -20,29 +21,23 @@ except ImportError:
     print("请先安装Rich库: pip install rich")
     sys.exit(1)
 
-import git # Import GitPython
 from .interactive import confirm_action
-from .utils import (
-    validate_git_repo, check_working_tree,
-    load_subtree_repos,
-    get_repo, run_git_command_stream # Import GitPython helpers
+from .utils import load_subtree_repos, find_repo_by_name
+from .split import (
+    split_subtree, check_branch_for_prefix, 
+    get_split_branch_name, run_git_command  # 复用split.py中的函数
 )
-from .split import split_subtree, check_branch_for_prefix, get_split_branch_name  # 导入新增的split功能
 
 # 创建Rich控制台对象
 console = Console()
 
 def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
-    推送单个子树的更新到远程 (使用 GitPython)
+    推送单个子树的更新到远程
     :param args: 命令行参数
     :param repo_info: 仓库配置信息
     :return: 操作是否成功
     """
-    repo = get_repo()
-    if not repo:
-        return False # Error printed by get_repo
-
     # 确保repo_info是有效的
     if not repo_info:
         if not args or not getattr(args, "name", None):
@@ -50,7 +45,6 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
             return False
             
         # 尝试通过名称查找仓库信息
-        from .utils import find_repo_by_name
         repo_name = args.name
         repo_info = find_repo_by_name(repo_name)
         if not repo_info:
@@ -67,7 +61,7 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     # 检查是否需要先执行split操作
     check_split = getattr(args, "check_split", True) if args else True
     if check_split:
-        has_branch, branch_name = check_branch_for_prefix(repo, prefix, name)
+        has_branch, branch_name = check_branch_for_prefix(None, prefix, name)
         if not has_branch:
             console.print(f"[yellow]提示:[/] 检测到{prefix}可能没有对应的split分支，需要先执行split操作")
             if not args or not getattr(args, "yes", False):
@@ -97,7 +91,7 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print("[bold yellow]---------------------[/]")
 
     # 执行命令
-    success, output = run_git_command_stream(repo, cmd_list, show_command=False)
+    success, output = run_git_command(cmd_list, True)
 
     if success:
         console.print(f"\n[bold green]成功将 {prefix} 的更改推送到 {name}![/]")
@@ -107,23 +101,26 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
         console.print("[yellow]提示:[/] 如果是权限问题，请确认是否有远程仓库的写入权限")
         console.print("      如果是冲突问题，可能需要先拉取远程更新")
         console.print("      如果看到'找不到远程ref对应的本地ref'错误，可能需要重新执行split操作，使用--force-split参数")
+        console.print(f"[yellow]错误信息:[/] {output}")
         return False
 
 def push_all_subtrees(args=None) -> bool:
     """
-    交互式推送所有子树更新 (使用 GitPython)
+    交互式推送所有子树更新
     :param args: 命令行参数
     :return: 操作是否成功
     """
     console.print("\n[bold cyan]--- Git Subtree 推送更新工具 ---[/]")
     
     # 检查是否在git仓库中
-    if not validate_git_repo(): # Uses GitPython now
+    success, _ = run_git_command(["rev-parse", "--is-inside-work-tree"], False)
+    if not success:
         console.print("[bold red]错误:[/] 当前目录不是git仓库。请在git仓库根目录下运行此脚本。")
         return False
     
     # 检查工作区是否有未提交的更改
-    if check_working_tree(): # Uses GitPython now
+    success, output = run_git_command(["status", "--porcelain"], False)
+    if success and output.strip():
         console.print("[bold yellow]警告:[/] 检测到工作区有未提交的更改。在推送之前，请先提交这些更改。")
         console.print("[yellow]提示:[/] 使用 'git add .' 和 'git commit' 来提交更改")
         return False
