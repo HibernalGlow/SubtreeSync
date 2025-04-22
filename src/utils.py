@@ -215,6 +215,53 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
             except Exception:
                 pass
 
+def run_command_direct(cmd: List[str], show_command: bool = True) -> bool:
+    """
+    执行命令并直接将输出显示在终端上，不捕获输出，避免Rich和编码问题。
+    这是处理Git命令的最简单可靠方式。
+    
+    :param cmd: 命令列表
+    :param show_command: 是否显示执行的命令
+    :return: 命令是否成功执行
+    """
+    if show_command:
+        cmd_str = " ".join(cmd)
+        console.print(f"[dim]$ {cmd_str}[/]")
+        
+    try:
+        # 直接使用subprocess.run，不捕获输出，让它显示在终端上
+        result = subprocess.run(
+            cmd,
+            # 不使用stdout=subprocess.PIPE和stderr=subprocess.PIPE
+            # 这样输出会直接显示在终端上
+            check=False,  # 不抛出异常，而是通过返回码判断成功与否
+            text=True,    # 文本模式
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        # 只返回成功与否，不返回输出内容
+        return result.returncode == 0
+    except FileNotFoundError:
+        error_msg = f"错误: 命令或程序 '{cmd[0]}' 未找到。请确保它在系统PATH中。"
+        console.print(f"[bold red]{error_msg}[/]")
+        return False
+    except Exception as e:
+        error_msg = f"命令执行时发生意外错误: {str(e)}"
+        console.print(f"[bold red]{error_msg}[/]")
+        return False
+
+def run_git_command_direct(cmd_args: List[str], show_command: bool = True) -> bool:
+    """
+    直接执行Git命令，输出显示在终端上，不捕获输出
+    
+    :param cmd_args: Git命令参数列表
+    :param show_command: 是否显示执行的命令
+    :return: 命令是否成功执行
+    """
+    full_cmd = ["git"] + cmd_args
+    return run_command_direct(full_cmd, show_command)
+
 # --- GitPython Integration ---
 
 _repo_cache = None

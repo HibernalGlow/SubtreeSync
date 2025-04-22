@@ -149,8 +149,10 @@ def run_command_or_copy(cmd: List[str], cmd_str: str, copy_only: bool = False) -
             if not Confirm.ask("是否继续执行命令?"):
                 return False, "操作已取消"
     
-    # 执行命令
-    return run_git_command(cmd, True)
+    # 执行命令 - 使用新的直接执行方法
+    from .utils import run_git_command_direct
+    success = run_git_command_direct(cmd, True)
+    return success, "" # 不再返回输出内容
 
 def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """

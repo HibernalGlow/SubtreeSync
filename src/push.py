@@ -86,9 +86,9 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(cmd_str)
     console.print("[bold yellow]---------------------[/]")
 
-    # 执行命令，使用run_command来获取实时输出
-    full_cmd = ["git"] + cmd_list
-    success, output = run_command(full_cmd)
+    # 执行命令，使用直接执行方法不捕获输出
+    from .utils import run_git_command_direct
+    success = run_git_command_direct(cmd_list)
 
     if success:
         console.print(f"\n[bold green]成功将 {prefix} 的更改推送到 {name}![/]")
@@ -98,9 +98,6 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
         console.print("[yellow]提示:[/] 如果是权限问题，请确认是否有远程仓库的写入权限")
         console.print("      如果是冲突问题，可能需要先拉取远程更新")
         console.print("      如果看到'找不到远程ref对应的本地ref'错误，可能需要重新执行split操作，使用--force-split参数")
-        if output:
-            print("\n错误信息:")
-            print(output)
         return False
 
 def push_all_subtrees(args=None) -> bool:
