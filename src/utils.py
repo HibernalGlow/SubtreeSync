@@ -121,7 +121,7 @@ def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
 
 def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     """
-    执行命令并返回结果，强制使用UTF-8解码并替换错误。
+    执行命令并返回结果，逐行读取字节流并强制UTF-8解码。
     :param cmd: 命令列表
     :param show_command: 是否显示执行的命令
     :return: (成功标志, 输出结果)
@@ -129,34 +129,46 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     if show_command:
         cmd_str = " ".join(cmd)
         console.print(f"[dim]$ {cmd_str}[/]")
-    
+
+    full_stdout = ""
+    full_stderr = ""
+    process = None  # Initialize process to None
+
     try:
-        # 运行命令，捕获原始字节输出
+        # 使用 Popen，不指定 text 或 encoding，获取字节流
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            # 不设置 text=True 或 encoding，直接处理字节
+            bufsize=1,  # 行缓冲
         )
-        
-        stdout_bytes, stderr_bytes = process.communicate()
+
+        # 实时读取标准输出字节流并解码打印
+        if process.stdout:
+            for line_bytes in iter(process.stdout.readline, b''):
+                line_str = line_bytes.decode('utf-8', errors='replace').rstrip()
+                console.print(line_str)
+                full_stdout += line_str + "\n"
+            process.stdout.close() # Ensure stdout is closed
+
+        # 读取标准错误字节流并解码打印
+        if process.stderr:
+            stderr_bytes = process.stderr.read()
+            stderr_str = stderr_bytes.decode('utf-8', errors='replace')
+            if stderr_str:
+                console.print(f"[red]{stderr_str}[/]")
+                full_stderr += stderr_str
+            process.stderr.close() # Ensure stderr is closed
+
+        # 等待进程结束
+        process.wait()
         return_code = process.returncode
-        
-        # 手动解码为UTF-8，替换无法解码的字节
-        stdout_str = stdout_bytes.decode('utf-8', errors='replace')
-        stderr_str = stderr_bytes.decode('utf-8', errors='replace')
-        
-        # 输出解码后的字符串
-        if stdout_str:
-            console.print(stdout_str)
-        if stderr_str:
-            console.print(f"[red]{stderr_str}[/]")
-            
-        # 合并输出用于返回
-        output = stdout_str + stderr_str
-        
-        return return_code == 0, output
-        
+
+        # 合并输出
+        output = full_stdout + full_stderr
+
+        return return_code == 0, output.strip()
+
     except FileNotFoundError:
         error_msg = f"错误: 命令或程序 '{cmd[0]}' 未找到。请确保它在系统PATH中。"
         console.print(f"[bold red]{error_msg}[/]")
@@ -164,7 +176,22 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     except Exception as e:
         error_msg = f"命令执行时发生意外错误: {str(e)}"
         console.print(f"[bold red]{error_msg}[/]")
+        # Ensure process streams are closed if an error occurs after Popen
+        if process and process.stdout:
+            process.stdout.close()
+        if process and process.stderr:
+            process.stderr.close()
         return False, error_msg
+    finally:
+        # Ensure process is terminated if it's still running
+        if process and process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=1) # Give it a second to terminate
+            except subprocess.TimeoutExpired:
+                process.kill() # Force kill if terminate doesn't work
+            except Exception:
+                pass # Ignore errors during cleanup
 
 def validate_git_repo() -> bool:
     """检查当前是否在git仓库中"""
