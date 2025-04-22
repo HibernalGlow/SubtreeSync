@@ -122,12 +122,13 @@ def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
 
 def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     """
-    执行命令并实时输出结果，强制UTF-8解码并禁用markup/highlight。
+    执行命令并实时输出结果，强制UTF-8解码，绕过rich打印。
     :param cmd: 命令列表
     :param show_command: 是否显示执行的命令
     :return: (成功标志, 完整输出结果)
     """
     if show_command:
+        # Still use console.print for the command itself for nice formatting
         cmd_str = " ".join(cmd)
         console.print(f"[dim]$ {cmd_str}[/]")
 
@@ -136,7 +137,7 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     process = None
 
     try:
-        # 使用 Popen 获取字节流，移除 bufsize=1
+        # 使用 Popen 获取字节流
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -146,39 +147,42 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
 
         # --- 实时处理 stdout ---
         if process.stdout:
-            # 使用 io.BufferedReader 读取字节流
             stdout_reader = io.BufferedReader(process.stdout)
             while True:
                 line_bytes = stdout_reader.readline()
-                if not line_bytes: # readline 返回空字节串表示EOF
+                if not line_bytes:
                     break
                 try:
-                    # 解码并打印，禁用 Rich 特性
-                    line_str = line_bytes.decode('utf-8', errors='replace').rstrip()
-                    console.print(line_str, markup=False, highlight=False)
-                    full_stdout += line_str + "\n"
+                    # 解码为 UTF-8，替换错误
+                    line_str = line_bytes.decode('utf-8', errors='replace')
+                    # 直接写入 sys.stdout，不经过 rich
+                    sys.stdout.write(line_str)
+                    sys.stdout.flush() # 确保立即显示
+                    full_stdout += line_str
                 except Exception as e:
-                    console.print(f"[bold red]Error processing stdout line: {e}[/]")
-                    console.print(f"[dim]Raw bytes: {line_bytes!r}[/]")
-            process.stdout.close() # 关闭流
+                    # 如果写入或解码失败，打印错误到 stderr
+                    error_msg = f"\n[Error processing stdout line: {e}] Raw bytes: {line_bytes!r}\n"
+                    sys.stderr.write(error_msg)
+                    sys.stderr.flush()
+            process.stdout.close()
 
-        # --- 处理 stderr (通常在最后读取) ---
+        # --- 处理 stderr ---
         stderr_str = ""
         if process.stderr:
-            stderr_bytes = process.stderr.read() # 读取所有剩余的 stderr
+            stderr_bytes = process.stderr.read()
             if stderr_bytes:
                 try:
                     stderr_str = stderr_bytes.decode('utf-8', errors='replace')
                     if stderr_str:
-                        # 打印 stderr
-                        with io.StringIO(stderr_str) as f:
-                            for line in f:
-                                console.print(f"[red]{line.rstrip()}[/]", markup=False, highlight=False)
+                        # 直接写入 sys.stderr
+                        sys.stderr.write(stderr_str)
+                        sys.stderr.flush() # 确保立即显示
                         full_stderr += stderr_str
                 except Exception as e:
-                    console.print(f"[bold red]Error processing stderr: {e}[/]")
-                    console.print(f"[dim]Raw stderr bytes: {stderr_bytes!r}[/]")
-            process.stderr.close() # 关闭流
+                    error_msg = f"\n[Error processing stderr: {e}] Raw stderr bytes: {stderr_bytes!r}\n"
+                    sys.stderr.write(error_msg)
+                    sys.stderr.flush()
+            process.stderr.close()
 
         # --- 等待进程结束 ---
         process.wait()
@@ -187,21 +191,20 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
         # 合并完整输出
         output = full_stdout + full_stderr
 
-        return return_code == 0, output.strip()
+        return return_code == 0, output.strip() # strip() might remove necessary newlines if output is multi-line
 
     except FileNotFoundError:
         error_msg = f"错误: 命令或程序 '{cmd[0]}' 未找到。请确保它在系统PATH中。"
+        # Use console.print for our own error messages
         console.print(f"[bold red]{error_msg}[/]")
         return False, error_msg
     except Exception as e:
         error_msg = f"命令执行时发生意外错误: {str(e)}"
         console.print(f"[bold red]{error_msg}[/]")
-        # 清理
         if process and process.stdout: process.stdout.close()
         if process and process.stderr: process.stderr.close()
         return False, error_msg
     finally:
-        # 确保进程终止
         if process and process.poll() is None:
             try:
                 process.terminate()
