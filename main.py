@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Git Subtree 同步工具 - 主入口
-集成添加、拉取和推送功能
+集成添加、拉取、推送和分离功能
 """
 
 import sys
@@ -64,6 +64,14 @@ python subtree-sync.py push [--name REPO_NAME]
 ```
 
 推送本地更改到所有或指定的远程仓库。
+
+### 分离子树
+
+```bash
+python subtree-sync.py split [--name REPO_NAME]
+```
+
+将子树目录分离为独立分支，为推送做准备。
 
 ### 列出子树
 
@@ -146,7 +154,14 @@ def run_interactive_mode():
                 # 单个仓库
                 console.print(f"\n[bold cyan]正在推送:[/] {selected_repos[0]['name']} ({selected_repos[0]['prefix']})")
                 # 使用与多个仓库相同的方式创建参数，确保一致性
-                args_dict = {"name": selected_repos[0]["name"], "yes": False, "check_changes": True, "interactive": True}
+                args_dict = {
+                    "name": selected_repos[0]["name"], 
+                    "yes": False, 
+                    "check_changes": True,
+                    "check_split": True,
+                    "force_split": False,
+                    "interactive": True
+                }
                 result = push_subtree(argparse.Namespace(**args_dict), selected_repos[0])
             else:
                 # 多个仓库
@@ -154,8 +169,45 @@ def run_interactive_mode():
                 for repo in selected_repos:
                     console.print(f"\n[bold cyan]正在推送:[/] {repo['name']} ({repo['prefix']})")
                     # 创建一个字典而不是直接使用Namespace对象，确保所有必要的参数都存在
-                    args_dict = {"name": repo["name"], "yes": True, "check_changes": True, "interactive": True}
+                    args_dict = {
+                        "name": repo["name"], 
+                        "yes": True, 
+                        "check_changes": True,
+                        "check_split": True,
+                        "force_split": False,
+                        "interactive": True
+                    }
                     sub_result = push_subtree(argparse.Namespace(**args_dict), repo)
+                    if not sub_result:
+                        result = False
+                        
+        elif mode == "split":
+            from src.split import split_all_subtrees, split_subtree
+            repos = load_subtree_repos()
+            
+            if not repos:
+                show_operation_result(False, "分离", "没有配置的子树仓库")
+                continue
+            
+            # 支持多选仓库
+            selected_repos = select_repos_for_action(repos, "分离")
+            if not selected_repos:
+                continue
+                
+            if len(selected_repos) == 1:
+                # 单个仓库
+                console.print(f"\n[bold cyan]正在分离:[/] {selected_repos[0]['name']} ({selected_repos[0]['prefix']})")
+                # 使用与多个仓库相同的方式创建参数，确保一致性
+                args_dict = {"name": selected_repos[0]["name"], "yes": False, "interactive": True}
+                result = split_subtree(argparse.Namespace(**args_dict), selected_repos[0])
+            else:
+                # 多个仓库
+                result = True
+                for repo in selected_repos:
+                    console.print(f"\n[bold cyan]正在分离:[/] {repo['name']} ({repo['prefix']})")
+                    # 创建一个字典而不是Namespace对象，避免get()方法错误
+                    args_dict = {"name": repo["name"], "yes": True, "interactive": True}
+                    sub_result = split_subtree(argparse.Namespace(**args_dict), repo)
                     if not sub_result:
                         result = False
                         
@@ -204,7 +256,16 @@ def main():
     push_parser.add_argument("--name", help="仓库名称，如不指定则推送所有")
     push_parser.add_argument("--yes", "-y", action="store_true", help="自动确认所有操作")
     push_parser.add_argument("--check-changes", action="store_true", help="检查是否有更改需要推送")
+    push_parser.add_argument("--check-split", action="store_true", help="检查是否需要先执行split", default=True)
+    push_parser.add_argument("--no-check-split", action="store_false", dest="check_split", help="不检查是否需要先执行split")
+    push_parser.add_argument("--force-split", action="store_true", help="强制执行split操作")
     push_parser.add_argument("--interactive", "-i", action="store_true", help="使用交互式菜单")
+    
+    # split 命令
+    split_parser = subparsers.add_parser("split", help="分离子树为独立分支")
+    split_parser.add_argument("--name", help="仓库名称，如不指定则分离所有")
+    split_parser.add_argument("--yes", "-y", action="store_true", help="自动确认所有操作")
+    split_parser.add_argument("--interactive", "-i", action="store_true", help="使用交互式菜单")
     
     # list 命令
     list_parser = subparsers.add_parser("list", help="列出所有子树")
@@ -239,6 +300,9 @@ def main():
     elif args.command == "push":
         from src.push import push_all_subtrees
         result = push_all_subtrees(args)
+    elif args.command == "split":
+        from src.split import split_all_subtrees
+        result = split_all_subtrees(args)
     elif args.command == "list":
         from src.list import list_subtrees
         result = list_subtrees(args)

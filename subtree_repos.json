@@ -5,6 +5,7 @@
       "remote": "https://github.com/HibernalGlow/PsdConvert.git",
       "prefix": "src/projects/PsdConvert",
       "branch": "main",
+      "split_branch": "subtree-PsdConvert",
       "added_time": "2025-04-22T11:15:00.000000",
       "extra": {}
     },
@@ -13,6 +14,7 @@
       "remote": "https://github.com/HibernalGlow/PicsConvert.git",
       "prefix": "src/projects/PicsConvert",
       "branch": "main",
+      "split_branch": "subtree-PicsConvert",
       "added_time": "2025-04-22T11:15:00.000000",
       "extra": {}
     },
@@ -21,6 +23,7 @@
       "remote": "https://github.com/HibernalGlow/AutoRepack.git",
       "prefix": "src/projects/AutoRepack",
       "branch": "main",
+      "split_branch": "subtree-AutoRepack",
       "added_time": "2025-04-22T11:15:00.000000",
       "extra": {}
     },
@@ -29,6 +32,7 @@
       "remote": "https://github.com/HibernalGlow/TaskGui.git",
       "prefix": "src/projects/TaskGui",
       "branch": "main",
+      "split_branch": "subtree-TaskGui",
       "added_time": "2025-04-22T11:15:00.000000",
       "extra": {}
     },
@@ -37,6 +41,7 @@
       "remote": "https://github.com/HibernalGlow/SubtreeSync.git",
       "prefix": "src/projects/SubtreeSync",
       "branch": "main",
+      "split_branch": "subtree-SubtreeSync",
       "added_time": "2025-04-22T10:58:43.745908",
       "extra": {}
     },
@@ -45,6 +50,7 @@
       "remote": "https://github.com/HibernalGlow/MangaClassify.git",
       "prefix": "src/projects/MangaClassify",
       "branch": "main",
+      "split_branch": "subtree-MangaClassify",
       "added_time": "2025-04-22T11:15:00.000000",
       "extra": {}
     }

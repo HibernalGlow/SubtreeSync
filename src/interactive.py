@@ -85,8 +85,8 @@ def select_mode() -> Optional[str]:
     Returns:
         选择的模式，取消则返回None
     """
-    modes = ["添加子树", "拉取更新", "推送更新", "列出子树"]
-    mode_cmds = ["add", "pull", "push", "list"]
+    modes = ["添加子树", "拉取更新", "推送更新", "分离子树", "列出子树"]
+    mode_cmds = ["add", "pull", "push", "split", "list"]
     
     choice_idx = show_menu("请选择操作模式", modes + ["退出"])
     

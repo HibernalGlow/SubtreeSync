@@ -31,21 +31,21 @@ from .utils import (
 # 创建Rich控制台对象
 console = Console()
 
-def check_branch_for_prefix(repo, prefix: str, branch_name: str) -> Tuple[bool, Optional[str]]:
+def check_branch_for_prefix(repo, prefix: str, split_branch_name: str) -> Tuple[bool, Optional[str]]:
     """
     检查指定前缀是否已经有对应的分支
     
     :param repo: GitPython库的仓库对象
     :param prefix: 子树前缀路径
-    :param branch_name: 目标分支名称
+    :param split_branch_name: Split目标分支名称
     :return: (是否有对应分支, 分支名称或None)
     """
     # 尝试查找前缀对应的分支
     try:
         # 检查本地是否已存在对应分支
         for branch in repo.branches:
-            if branch.name == branch_name:
-                return True, branch_name
+            if branch.name == split_branch_name:
+                return True, split_branch_name
                 
         # 使用git命令查找是否有带subtree-split注释的提交
         # 这里我们执行一个git命令来查找subtree相关的提交
@@ -54,7 +54,7 @@ def check_branch_for_prefix(repo, prefix: str, branch_name: str) -> Tuple[bool, 
         
         # 如果找到了相关提交，说明曾经进行过split
         if output.strip():
-            return True, branch_name
+            return True, split_branch_name
             
         return False, None
     except Exception as e:
@@ -89,16 +89,17 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     
     name = repo_info.get("name", "")
     prefix = repo_info.get("prefix", "")
-    branch = repo_info.get("branch", "main")
+    # 使用单独的split_branch，如果未设置则生成默认值
+    split_branch = repo_info.get("split_branch", f"subtree-split-{name}")
     
     console.print(f"\n[bold cyan]正在为 {prefix} 执行 split 操作[/]")
     
     # 检查是否已经有对应分支
-    has_branch, _ = check_branch_for_prefix(repo, prefix, branch)
+    has_branch, _ = check_branch_for_prefix(repo, prefix, split_branch)
     
     # 即使有分支，我们也执行split以确保最新变更被分离出来
     # 构建 git subtree split 命令列表
-    cmd_list = ["subtree", "split", f"--prefix={prefix}", f"--branch={branch}", "--rejoin"]
+    cmd_list = ["subtree", "split", f"--prefix={prefix}", f"--branch={split_branch}", "--rejoin"]
     
     # 显示完整命令
     cmd_str = " ".join(['git'] + cmd_list)
@@ -110,7 +111,7 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     success, output = run_git_command_stream(repo, cmd_list, show_command=False)
 
     if success:
-        console.print(f"\n[bold green]成功为 {prefix} 执行 split 操作![/] 分支: {branch}")
+        console.print(f"\n[bold green]成功为 {prefix} 执行 split 操作![/] 分支: {split_branch}")
         return True
     else:
         console.print(f"\n[bold red]为 {prefix} 执行 split 操作失败[/]")
@@ -149,14 +150,14 @@ def split_all_subtrees(args=None) -> bool:
     table = Table(show_header=True)
     table.add_column("#", style="dim")
     table.add_column("仓库名", style="cyan")
-    table.add_column("分支", style="blue")
+    table.add_column("Split分支", style="blue")
     table.add_column("本地路径", style="yellow")
     
     for i, repo in enumerate(repos):
         table.add_row(
             str(i + 1),
             repo.get("name", ""),
-            repo.get("branch", "main"),
+            repo.get("split_branch", f"subtree-split-{repo.get('name', '')}"),
             repo.get("prefix", "")
         )
     

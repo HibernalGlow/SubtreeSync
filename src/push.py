@@ -61,15 +61,17 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     remote = repo_info.get("remote", "")
     prefix = repo_info.get("prefix", "")
     branch = repo_info.get("branch", "main")
+    # 使用单独的split_branch，如果未设置则生成默认值
+    split_branch = repo_info.get("split_branch", f"subtree-split-{name}")
     
     console.print(f"\n将 {prefix} 的更改推送到 {name}")
     
     # 检查是否需要先执行split操作
     check_split = getattr(args, "check_split", True) if args else True
     if check_split:
-        has_branch, _ = check_branch_for_prefix(repo, prefix, branch)
+        has_branch, _ = check_branch_for_prefix(repo, prefix, split_branch)
         if not has_branch:
-            console.print(f"[yellow]提示:[/] 检测到{prefix}可能没有对应的分支，需要先执行split操作")
+            console.print(f"[yellow]提示:[/] 检测到{prefix}可能没有对应的split分支，需要先执行split操作")
             if not args or not getattr(args, "yes", False):
                 if not Confirm.ask("是否先执行split操作?"):
                     console.print("[yellow]操作已取消[/]")
@@ -142,6 +144,7 @@ def push_all_subtrees(args=None) -> bool:
     table.add_column("仓库名", style="cyan")
     table.add_column("远程地址", style="green")
     table.add_column("分支", style="blue")
+    table.add_column("Split分支", style="magenta")
     table.add_column("本地路径", style="yellow")
     
     for i, repo in enumerate(repos):
@@ -150,6 +153,7 @@ def push_all_subtrees(args=None) -> bool:
             repo.get("name", ""),
             repo.get("remote", ""),
             repo.get("branch", "main"),
+            repo.get("split_branch", f"subtree-split-{repo.get('name', '')}"),
             repo.get("prefix", "")
         )
     
