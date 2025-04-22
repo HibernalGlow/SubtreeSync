@@ -43,13 +43,27 @@ def has_local_changes(prefix: str) -> bool:
     except Exception:
         return False
 
-def push_subtree(repo_info: Dict[str, Any], args=None) -> bool:
+def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
     推送单个子树的更新到远程
-    :param repo_info: 仓库配置信息
     :param args: 命令行参数
+    :param repo_info: 仓库配置信息
     :return: 操作是否成功
     """
+    # 确保repo_info是有效的
+    if not repo_info:
+        if not args or not getattr(args, "name", None):
+            console.print("[bold red]错误:[/] 没有指定仓库信息或名称")
+            return False
+            
+        # 尝试通过名称查找仓库信息
+        from .utils import find_repo_by_name
+        repo_name = args.name
+        repo_info = find_repo_by_name(repo_name)
+        if not repo_info:
+            console.print(f"[bold red]错误:[/] 找不到名称为 '{repo_name}' 的仓库")
+            return False
+    
     name = repo_info.get("name", "")
     remote = repo_info.get("remote", "")
     prefix = repo_info.get("prefix", "")
@@ -58,7 +72,7 @@ def push_subtree(repo_info: Dict[str, Any], args=None) -> bool:
     console.print(f"\n[bold blue]将 {prefix} 的更改推送到 {name}[/]")
     
     # 如果指定了检查更改选项，先检查是否有更改要推送
-    if args and args.check_changes:
+    if args and getattr(args, "check_changes", False):
         if not has_local_changes(prefix):
             console.print(f"[yellow]提示:[/] {prefix} 目录没有检测到需要推送的更改，跳过")
             return True

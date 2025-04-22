@@ -114,15 +114,18 @@ def run_interactive_mode():
                 
             if len(selected_repos) == 1:
                 # 单个仓库
-                args = argparse.Namespace(name=selected_repos[0]["name"], yes=False, interactive=True)
-                result = pull_subtree(args, selected_repos[0])
+                console.print(f"\n[bold cyan]正在拉取:[/] {selected_repos[0]['name']} ({selected_repos[0]['prefix']})")
+                # 使用与多个仓库相同的方式创建参数，确保一致性
+                args_dict = {"name": selected_repos[0]["name"], "yes": False, "interactive": True}
+                result = pull_subtree(argparse.Namespace(**args_dict), selected_repos[0])
             else:
                 # 多个仓库
                 result = True
                 for repo in selected_repos:
                     console.print(f"\n[bold cyan]正在拉取:[/] {repo['name']} ({repo['prefix']})")
-                    args = argparse.Namespace(name=repo["name"], yes=True, interactive=True)
-                    sub_result = pull_subtree(args, repo)
+                    # 创建一个字典而不是Namespace对象，避免get()方法错误
+                    args_dict = {"name": repo["name"], "yes": True, "interactive": True}
+                    sub_result = pull_subtree(argparse.Namespace(**args_dict), repo)
                     if not sub_result:
                         result = False
                         
@@ -141,15 +144,18 @@ def run_interactive_mode():
             
             if len(selected_repos) == 1:
                 # 单个仓库
-                args = argparse.Namespace(name=selected_repos[0]["name"], yes=False, check_changes=True, interactive=True)
-                result = push_subtree(args, selected_repos[0])
+                console.print(f"\n[bold cyan]正在推送:[/] {selected_repos[0]['name']} ({selected_repos[0]['prefix']})")
+                # 使用与多个仓库相同的方式创建参数，确保一致性
+                args_dict = {"name": selected_repos[0]["name"], "yes": False, "check_changes": True, "interactive": True}
+                result = push_subtree(argparse.Namespace(**args_dict), selected_repos[0])
             else:
                 # 多个仓库
                 result = True
                 for repo in selected_repos:
                     console.print(f"\n[bold cyan]正在推送:[/] {repo['name']} ({repo['prefix']})")
-                    args = argparse.Namespace(name=repo["name"], yes=True, check_changes=True, interactive=True)
-                    sub_result = push_subtree(args, repo)
+                    # 创建一个字典而不是直接使用Namespace对象，确保所有必要的参数都存在
+                    args_dict = {"name": repo["name"], "yes": True, "check_changes": True, "interactive": True}
+                    sub_result = push_subtree(argparse.Namespace(**args_dict), repo)
                     if not sub_result:
                         result = False
                         

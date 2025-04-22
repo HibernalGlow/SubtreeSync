@@ -24,13 +24,27 @@ from .utils import (
     load_subtree_repos
 )
 
-def pull_subtree(repo_info: Dict[str, Any], args=None) -> bool:
+def pull_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     """
     拉取单个子树的更新
-    :param repo_info: 仓库配置信息
     :param args: 命令行参数
+    :param repo_info: 仓库配置信息
     :return: 操作是否成功
     """
+    # 确保repo_info是有效的
+    if not repo_info:
+        if not args or not getattr(args, "name", None):
+            console.print("[bold red]错误:[/] 没有指定仓库信息或名称")
+            return False
+            
+        # 尝试通过名称查找仓库信息
+        from .utils import find_repo_by_name
+        repo_name = args.name
+        repo_info = find_repo_by_name(repo_name)
+        if not repo_info:
+            console.print(f"[bold red]错误:[/] 找不到名称为 '{repo_name}' 的仓库")
+            return False
+    
     name = repo_info.get("name", "")
     remote = repo_info.get("remote", "")
     prefix = repo_info.get("prefix", "")
