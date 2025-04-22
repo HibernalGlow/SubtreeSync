@@ -131,41 +131,33 @@ def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
         console.print(f"[dim]$ {cmd_str}[/]")
     
     try:
-        # 不使用进度条，直接实时显示输出
-        process = subprocess.Popen(
+        # 直接使用subprocess.run，避免线程相关的问题
+        result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',  # 明确指定使用UTF-8编码
-            errors='replace'  # 遇到解码错误时替换为占位符，而不是抛出异常
+            encoding='utf-8',       # 明确使用UTF-8编码
+            errors='replace',       # 遇到解码错误时替换为Unicode替代字符
+            text=True,              # 返回文本而不是字节
+            check=False             # 不要因为非零返回码而抛出异常
         )
         
-        # 实时输出命令执行结果
-        all_output = []
-        while True:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                console.print(output.rstrip())
-                all_output.append(output)
+        # 输出标准输出
+        if result.stdout:
+            console.print(result.stdout)
+            
+        # 输出标准错误
+        if result.stderr:
+            console.print("[red]" + result.stderr + "[/]")
         
-        # 收集错误输出
-        err_output = process.stderr.read()
-        if err_output:
-            console.print("[red]" + err_output + "[/]")
-            all_output.append(err_output)
-        
-        # 等待进程结束并获取返回码
-        return_code = process.poll()
-        
-        # 组合所有输出
-        complete_output = ''.join(all_output)
-        
-        return return_code == 0, complete_output
+        # 合并输出用于返回
+        output = result.stdout + result.stderr if result.stderr else result.stdout
+        return result.returncode == 0, output
+    
     except Exception as e:
-        return False, str(e)
+        error_msg = f"命令执行失败: {str(e)}"
+        console.print(f"[bold red]{error_msg}[/]")
+        return False, error_msg
 
 def validate_git_repo() -> bool:
     """检查当前是否在git仓库中"""
