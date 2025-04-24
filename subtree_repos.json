@@ -53,14 +53,6 @@
       "split_branch": "MangaClassify",
       "added_time": "2025-04-22T11:15:00.000000",
       "extra": {}
-    },
-    {
-      "name": "OrganizeFolder",
-      "remote": "https://github.com/HibernalGlow/OrganizeFolder.git",
-      "prefix": "src/projects/OrganizeFolder",
-      "branch": "main",
-      "added_time": "2025-04-23T15:03:36.841006",
-      "extra": {}
     }
   ]
 }

@@ -21,9 +21,9 @@ except ImportError:
 
 from .console import console  # 导入共享的控制台实例
 from .interactive import confirm_action
-from .utils import load_subtree_repos, find_repo_by_name, run_command_direct
+from .utils import load_subtree_repos, find_repo_by_name, run_command
 from .split import (
-    split_subtree, check_branch_for_prefix, check_working_tree, 
+    split_subtree, check_branch_for_prefix, 
     get_split_branch_name, run_git_command  # 复用split.py中的函数
 )
 
@@ -87,8 +87,8 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print("[bold yellow]---------------------[/]")
 
     # 执行命令，使用直接执行方法不捕获输出
-    cmd_full = ["git"] + cmd_list
-    success = run_command_direct(cmd_full)
+    from .utils import run_git_command_direct
+    success = run_git_command_direct(cmd_list)
 
     if success:
         console.print(f"\n[bold green]成功将 {prefix} 的更改推送到 {name}![/]")
@@ -109,13 +109,14 @@ def push_all_subtrees(args=None) -> bool:
     console.print("\n[bold cyan]--- Git Subtree 推送更新工具 ---[/]")
     
     # 检查是否在git仓库中
-    is_git_repo = run_command_direct(["git", "rev-parse", "--is-inside-work-tree"])
-    if not is_git_repo:
+    success, _ = run_git_command(["rev-parse", "--is-inside-work-tree"], False)
+    if not success:
         console.print("[bold red]错误:[/] 当前目录不是git仓库。请在git仓库根目录下运行此脚本。")
         return False
     
     # 检查工作区是否有未提交的更改
-    if check_working_tree():
+    success, output = run_git_command(["status", "--porcelain"], False)
+    if success and output.strip():
         console.print("[bold yellow]警告:[/] 检测到工作区有未提交的更改。在推送之前，请先提交这些更改。")
         console.print("[yellow]提示:[/] 使用 'git add .' 和 'git commit' 来提交更改")
         return False

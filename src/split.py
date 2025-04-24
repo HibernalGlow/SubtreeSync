@@ -31,7 +31,7 @@ from .interactive import confirm_action
 from .utils import (
     validate_git_repo, check_working_tree,
     load_subtree_repos, find_repo_by_name,
-    run_command_direct # 只保留需要的函数
+    run_git_command_stream, run_command
 )
 
 def copy_to_clipboard(text: str) -> bool:
@@ -71,13 +71,10 @@ def run_git_command(cmd_args: List[str], show_output: bool = False) -> Tuple[boo
     :param show_output: 是否显示输出
     :return: (成功与否, 输出内容)
     """
-    # 导入直接执行命令的函数
-    from .utils import run_git_command_direct
+    full_cmd = ["git"] + cmd_args
     
     if not show_output:
-        # 如果不需要显示输出，但仍需要获取输出内容
-        # 使用原始方法捕获输出
-        full_cmd = ["git"] + cmd_args
+        # 对于不需要显示输出的命令，使用简单的subprocess.run
         try:
             process = subprocess.run(
                 full_cmd,
@@ -91,9 +88,8 @@ def run_git_command(cmd_args: List[str], show_output: bool = False) -> Tuple[boo
         except Exception as e:
             return False, str(e)
     
-    # 对于需要显示输出的命令，使用直接执行方法
-    success = run_git_command_direct(cmd_args)
-    return success, ""  # 直接执行方式不返回输出内容
+    # 对于需要显示输出的命令，使用实时输出的方式
+    return run_command(full_cmd)
 
 def check_branch_for_prefix(repo_dir: str, prefix: str, repo_name: str) -> Tuple[bool, Optional[str]]:
     """
@@ -225,14 +221,14 @@ def split_all_subtrees(args=None) -> bool:
     console.print("\n[bold cyan]--- Git Subtree Split 工具 ---[/]")
     
     # 检查是否在git仓库中
-    is_git_repo = run_command_direct(["git", "rev-parse", "--is-inside-work-tree"])
-    if not is_git_repo:
+    success, _ = run_git_command(["rev-parse", "--is-inside-work-tree"], False)
+    if not success:
         console.print("[bold red]错误:[/] 当前目录不是git仓库。请在git仓库根目录下运行此脚本。")
         return False
     
     # 检查工作区是否有未提交的更改
-    # 注意：由于run_command_direct不返回输出内容，所以我们需要使用另一种方法检查
-    if check_working_tree():
+    success, output = run_git_command(["status", "--porcelain"], False)
+    if success and output.strip():
         console.print("[bold yellow]警告:[/] 检测到工作区有未提交的更改。在执行split之前，请先提交这些更改。")
         console.print("[yellow]提示:[/] 使用 'git add .' 和 'git commit' 来提交更改")
         return False

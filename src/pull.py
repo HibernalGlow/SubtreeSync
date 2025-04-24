@@ -22,9 +22,10 @@ except ImportError:
 
 from .interactive import confirm_action
 from .utils import (
+    run_command, # Keep if needed for non-git, otherwise remove
     validate_git_repo, check_working_tree,
     load_subtree_repos,
-    get_repo, run_command_direct # 替换为 run_command_direct
+    get_repo, run_git_command_stream # Import GitPython helpers
 )
 
 def pull_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
@@ -60,16 +61,16 @@ def pull_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     print(f"\n从 {name} 拉取更新到 {prefix}")
 
     # 构建 git subtree pull 命令列表
-    cmd_list = ["git", "subtree", "pull", f"--prefix={prefix}", name, branch, "--squash"]
+    cmd_list = ["subtree", "pull", f"--prefix={prefix}", name, branch, "--squash"]
 
     # 显示完整命令
-    cmd_str = " ".join(cmd_list)
+    cmd_str = " ".join(['git'] + cmd_list)
     print("\n--- Git Pull 命令 ---")
     print(cmd_str)
     print("---------------------")
 
-    # 执行命令，使用直接执行方法
-    success = run_command_direct(cmd_list)
+    # 执行命令
+    success, output = run_git_command_stream(repo, cmd_list, show_command=False)
 
     if success:
         print(f"\n从 {name} 成功拉取更新!")

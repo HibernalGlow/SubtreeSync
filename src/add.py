@@ -27,15 +27,17 @@ from .interactive import confirm_action
 from .utils import (
     validate_git_repo, check_working_tree,
     load_subtree_repos, save_subtree_repo, extract_repo_name,
-    get_repo, run_command_direct # 只保留需要的函数
+    get_repo, run_git_command_stream,run_command # Import GitPython helpers
 )
 
 def handle_working_tree_changes() -> bool:
     """处理工作区未提交的更改"""
-    print("\n检测到工作区有未提交的更改...")
+    console.print("[bold yellow]警告:[/] 检测到工作区有未提交的修改")
     
-    # 检查更改状态，使用直接执行git命令
-    run_command_direct(["git", "status", "-s"])
+    # 显示当前修改
+    success, status_output = run_command(["git", "status", "-s"])
+    if success and status_output.strip():
+        console.print(Panel(status_output.strip(), title="未提交的更改", border_style="yellow"))
     
     # 提供解决方案选项
     console.print("[bold]解决方案:[/]")
@@ -49,14 +51,14 @@ def handle_working_tree_changes() -> bool:
         # 自动提交
         commit_msg = Prompt.ask("[bold cyan]请输入提交信息[/]", default="Auto commit before adding subtree")
         console.print("[bold blue]提交更改中...[/]")
-        add_success = run_command_direct(["git", "add", "."])
+        add_success, _ = run_command(["git", "add", "."])
         if add_success:
-            commit_success = run_command_direct(["git", "commit", "-m", commit_msg])
+            commit_success, commit_output = run_command(["git", "commit", "-m", commit_msg])
             if commit_success:
                 console.print("[bold green]更改已成功提交[/]")
                 return True
             else:
-                console.print(f"[bold red]提交失败[/]")
+                console.print(f"[bold red]提交失败:[/] {commit_output}")
                 return False
         else:
             console.print("[bold red]暂存更改失败[/]")
@@ -65,13 +67,13 @@ def handle_working_tree_changes() -> bool:
     elif choice == "2":
         # 暂存更改
         console.print("[bold blue]暂存更改中...[/]")
-        stash_success = run_command_direct(["git", "stash", "save", "Stashed before adding subtree"])
+        stash_success, stash_output = run_command(["git", "stash", "save", "Stashed before adding subtree"])
         if stash_success:
             console.print("[bold green]更改已成功暂存[/]")
             console.print("[cyan]提示: 操作完成后可使用 'git stash pop' 恢复暂存的更改[/]")
             return True
         else:
-            console.print(f"[bold red]暂存失败[/]")
+            console.print(f"[bold red]暂存失败:[/] {stash_output}")
             return False
     
     else:
@@ -257,32 +259,25 @@ def add_subtree(args=None) -> bool:
         existing_remote = next((r for r in repo.remotes if r.name == repo_name), None)
         if existing_remote:
             print(f"远程仓库 '{repo_name}' 已存在，更新 URL 为: {remote}")
-            # 使用run_command_direct更新远程仓库URL
-            run_command_direct(["git", "remote", "set-url", repo_name, remote])
+            # Update URL using git command via execute, as direct modification can be tricky
+            repo.git.remote('set-url', repo_name, remote)
         else:
             print(f"添加远程仓库: {repo_name} -> {remote}")
-            # 使用run_command_direct添加远程仓库
-            run_command_direct(["git", "remote", "add", repo_name, remote])
+            repo.create_remote(repo_name, url=remote)
     except Exception as e:
         print(f"处理远程仓库 '{repo_name}' 时出错: {e}")
         return False
 
     # --- 添加 subtree ---
     print(f"\n添加subtree: {prefix} <- {repo_name}/{branch}")
-    # 构建git subtree add命令
-    cmd_list = ["git", "subtree", "add", f"--prefix={prefix}", repo_name, branch, "--squash"]
+    subtree_cmd_list = ["subtree", "add", f"--prefix={prefix}", repo_name, branch, "--squash"]
 
-    # 显示完整命令
-    cmd_str = " ".join(cmd_list)
-    console.print("\n[bold yellow]--- Git 添加 Subtree 命令 ---[/]")
-    console.print(cmd_str)
-    console.print("[bold yellow]------------------------------[/]")
-    
-    # 执行命令，使用直接执行方法
-    success = run_command_direct(cmd_list)
+    # Use the new streaming function
+    success, output = run_git_command_stream(repo, subtree_cmd_list, show_command=False) # show_command=False because we print manually above
 
     if success:
         console.print("[bold green]Subtree添加成功![/]")
+        console.print(Panel(output.strip(), border_style="green", title="命令输出"))
         
         # 保存仓库配置
         from datetime import datetime
@@ -308,50 +303,46 @@ def add_subtree(args=None) -> bool:
         
         return True
     else:
-        console.print("[bold red]Subtree添加失败[/]")
+        console.print("[bold red]Subtree添加失败:[/]")
+        console.print(Panel(output.strip(), border_style="red", title="错误输出"))
         
         # 检查是否因为工作区有修改而失败
-        console.print("[bold yellow]原因:[/] 可能是工作区有未提交的修改")
-        if Confirm.ask("是否尝试处理未提交的更改并重试?"):
-            if handle_working_tree_changes():
-                # 重试添加subtree
-                console.print(f"\n[bold blue]重试添加subtree:[/] {prefix} <- {repo_name}/{branch}")
-                
-                # 显示重试的命令
-                console.print("\n[bold yellow]--- 重试 Git 添加 Subtree 命令 ---[/]")
-                console.print(cmd_str)
-                console.print("[bold yellow]----------------------------------[/]")
-                
-                # 使用run_command_direct重试
-                retry_success = run_command_direct(cmd_list)
-                
-                if retry_success:
-                    console.print("[bold green]Subtree添加成功![/]")
-                    
-                    # 保存仓库配置
-                    from datetime import datetime
-                    repo_info = {
-                        "name": repo_name,
-                        "remote": remote,
-                        "prefix": prefix,
-                        "branch": branch,
-                        "added_time": datetime.now().isoformat(),
-                        "extra": {}  # 预留扩展空间
-                    }
-                    
-                    if save_subtree_repo(repo_info):
-                        console.print("[green]已保存仓库配置到本地[/]")
-                    
-                    # 询问是否添加到Taskfile.yml
-                    if not args or not args.no_taskfile:
-                        add_to_taskfile_flag = True
-                        if not args or not args.yes:
-                            add_to_taskfile_flag = Confirm.ask("\n是否将此subtree添加到Taskfile.yml?", default=True)
-                        if add_to_taskfile_flag:
-                            add_to_taskfile(prefix, remote, branch)
-                    
-                    return True
-                else:
-                    console.print("[bold red]重试添加subtree失败[/]")
+        if "working tree has modifications" in output:
+            console.print("[bold yellow]原因:[/] 工作区有未提交的修改")
+            if Confirm.ask("是否尝试处理未提交的更改并重试?"):
+                if handle_working_tree_changes():
+                    # 重试添加subtree
+                    console.print(f"\n[bold blue]重试添加subtree:[/] {prefix} <- {repo_name}/{branch}")
+                    retry_success, retry_output = run_command(subtree_cmd_list)
+                    if retry_success:
+                        console.print("[bold green]Subtree添加成功![/]")
+                        console.print(Panel(retry_output.strip(), border_style="green", title="命令输出"))
+                        
+                        # 保存仓库配置
+                        from datetime import datetime
+                        repo_info = {
+                            "name": repo_name,
+                            "remote": remote,
+                            "prefix": prefix,
+                            "branch": branch,
+                            "added_time": datetime.now().isoformat(),
+                            "extra": {}  # 预留扩展空间
+                        }
+                        
+                        if save_subtree_repo(repo_info):
+                            console.print("[green]已保存仓库配置到本地[/]")
+                        
+                        # 询问是否添加到Taskfile.yml
+                        if not args or not args.no_taskfile:
+                            add_to_taskfile_flag = True
+                            if not args or not args.yes:
+                                add_to_taskfile_flag = Confirm.ask("\n是否将此subtree添加到Taskfile.yml?", default=True)
+                            if add_to_taskfile_flag:
+                                add_to_taskfile(prefix, remote, branch)
+                        
+                        return True
+                    else:
+                        console.print("[bold red]重试添加subtree失败:[/]")
+                        console.print(Panel(retry_output.strip(), border_style="red", title="错误输出"))
         
         return False
