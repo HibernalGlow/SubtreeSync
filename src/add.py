@@ -245,6 +245,9 @@ def add_subtree(args=None) -> bool:
     table.add_row("本地仓库名", repo_name)
     table.add_row("本地目录前缀", prefix)
     table.add_row("分支名称", branch)
+    # 自动生成并显示 split_branch
+    split_branch_name = f"{repo_name}#Sub"
+    table.add_row("Split 分支名", split_branch_name) 
     
     console.print(table)
     
@@ -286,6 +289,7 @@ def add_subtree(args=None) -> bool:
             "remote": remote,
             "prefix": prefix,
             "branch": branch,
+            "split_branch": split_branch_name, # 添加自动生成的 split_branch
             "added_time": datetime.now().isoformat(),
             "extra": {}  # 预留扩展空间
         }
@@ -318,13 +322,14 @@ def add_subtree(args=None) -> bool:
                         console.print("[bold green]Subtree添加成功![/]")
                         console.print(Panel(retry_output.strip(), border_style="green", title="命令输出"))
                         
-                        # 保存仓库配置
+                        # 保存仓库配置 (同样需要添加 split_branch)
                         from datetime import datetime
                         repo_info = {
                             "name": repo_name,
                             "remote": remote,
                             "prefix": prefix,
                             "branch": branch,
+                            "split_branch": split_branch_name, # 添加自动生成的 split_branch
                             "added_time": datetime.now().isoformat(),
                             "extra": {}  # 预留扩展空间
                         }

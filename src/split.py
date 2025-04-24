@@ -53,16 +53,6 @@ def copy_to_clipboard(text: str) -> bool:
         console.print(f"[bold red]复制到剪贴板时出错:[/] {str(e)}")
         return False
 
-def get_split_branch_name(repo_name: str) -> str:
-    """
-    根据仓库名生成split分支名，格式为"仓库名#ST日期"
-    
-    :param repo_name: 仓库名称
-    :return: 生成的分支名
-    """
-    today = datetime.datetime.now().strftime("%y%m%d")
-    return f"{repo_name}#ST{today}"
-
 def run_git_command(cmd_args: List[str], show_output: bool = False) -> Tuple[bool, str]:
     """
     使用子进程执行Git命令
@@ -90,46 +80,6 @@ def run_git_command(cmd_args: List[str], show_output: bool = False) -> Tuple[boo
     
     # 对于需要显示输出的命令，使用实时输出的方式
     return run_command(full_cmd)
-
-def check_branch_for_prefix(repo_dir: str, prefix: str, repo_name: str) -> Tuple[bool, Optional[str]]:
-    """
-    检查指定前缀是否已经有对应的分支
-    
-    :param repo_dir: Git仓库目录
-    :param prefix: 子树前缀路径
-    :param repo_name: 仓库名称，用于生成分支名
-    :return: (是否有对应分支, 分支名称或None)
-    """
-    # 根据仓库名和当前日期生成分支名
-    split_branch_name = get_split_branch_name(repo_name)
-    
-    # 尝试查找前缀对应的分支
-    try:
-        # 检查本地是否已存在对应分支
-        success, output = run_git_command(["branch"], False)
-        if success:
-            branches = [b.strip() for b in output.split('\n') if b.strip()]
-            for branch in branches:
-                # 移除分支名称前的'*'和空格
-                clean_name = branch.replace('*', '').strip()
-                if clean_name == split_branch_name:
-                    return True, split_branch_name
-                # 检查是否有以仓库名#ST开头的分支（即早期的split分支）
-                elif clean_name.startswith(f"{repo_name}#ST"):
-                    return True, clean_name
-        
-        # 使用git命令查找是否有带subtree-split注释的提交
-        cmd = ["log", "--grep=git-subtree-dir", f"--grep={prefix}", "--pretty=format:%H"]
-        success, output = run_git_command(cmd, False)
-        
-        # 如果找到了相关提交，说明曾经进行过split
-        if success and output.strip():
-            return True, split_branch_name
-        
-        return False, split_branch_name
-    except Exception as e:
-        console.print(f"[bold red]检查分支时出错:[/] {str(e)}")
-        return False, split_branch_name
 
 def run_command_or_copy(cmd: List[str], cmd_str: str, copy_only: bool = False) -> Tuple[bool, str]:
     """
@@ -177,17 +127,16 @@ def split_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     
     name = repo_info.get("name", "")
     prefix = repo_info.get("prefix", "")
+    # 使用 JSON 文件中定义的 split_branch 名称
+    split_branch = repo_info.get("split_branch") 
     
-    # 使用新命名规则生成分支名
-    split_branch = get_split_branch_name(name)
+    if not split_branch:
+        console.print(f"[bold red]错误:[/] 仓库 '{name}' 的配置中缺少 'split_branch' 定义")
+        return False
+
+    console.print(f"\n[bold cyan]正在为 {prefix} 执行 split 操作，目标分支: {split_branch}[/]")
     
-    console.print(f"\n[bold cyan]正在为 {prefix} 执行 split 操作[/]")
-    
-    # 检查是否已经有对应分支
-    has_branch, branch_name = check_branch_for_prefix(".", prefix, name)
-    
-    # 即使有分支，我们也执行split以确保最新变更被分离出来
-    # 构建 git subtree split 命令列表
+    # 构建 git subtree split 命令列表，使用固定的 split_branch
     cmd_list = ["subtree", "split", f"--prefix={prefix}", f"--branch={split_branch}", "--rejoin"]
     
     # 显示完整命令
@@ -245,16 +194,17 @@ def split_all_subtrees(args=None) -> bool:
     table = Table(show_header=True)
     table.add_column("#", style="dim")
     table.add_column("仓库名", style="cyan")
-    table.add_column("Split分支", style="blue")
+    table.add_column("Split分支", style="blue") # 使用固定的分支名
     table.add_column("本地路径", style="yellow")
     
     for i, repo in enumerate(repos):
         repo_name = repo.get("name", "")
-        split_branch = get_split_branch_name(repo_name)
+        # 从 JSON 获取 split_branch
+        split_branch = repo.get("split_branch", "[未定义]") 
         table.add_row(
             str(i + 1),
             repo_name,
-            split_branch,
+            split_branch, # 显示固定的分支名
             repo.get("prefix", "")
         )
     
