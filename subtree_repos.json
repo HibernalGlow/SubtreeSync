@@ -1,0 +1,66 @@
+{
+  "repos": [
+    {
+      "name": "PsdConvert",
+      "remote": "https://github.com/HibernalGlow/PsdConvert.git",
+      "prefix": "src/projects/PsdConvert",
+      "branch": "main",
+      "split_branch": "PsdConvert",
+      "added_time": "2025-04-22T11:15:00.000000",
+      "extra": {}
+    },
+    {
+      "name": "PicsConvert",
+      "remote": "https://github.com/HibernalGlow/PicsConvert.git",
+      "prefix": "src/projects/PicsConvert",
+      "branch": "main",
+      "split_branch": "PicsConvert",
+      "added_time": "2025-04-22T11:15:00.000000",
+      "extra": {}
+    },
+    {
+      "name": "AutoRepack",
+      "remote": "https://github.com/HibernalGlow/AutoRepack.git",
+      "prefix": "src/projects/AutoRepack",
+      "branch": "main",
+      "split_branch": "AutoRepack",
+      "added_time": "2025-04-22T11:15:00.000000",
+      "extra": {}
+    },
+    {
+      "name": "TaskGui",
+      "remote": "https://github.com/HibernalGlow/TaskGui.git",
+      "prefix": "src/projects/TaskGui",
+      "branch": "main",
+      "split_branch": "TaskGui",
+      "added_time": "2025-04-22T11:15:00.000000",
+      "extra": {}
+    },
+    {
+      "name": "SubtreeSync",
+      "remote": "https://github.com/HibernalGlow/SubtreeSync.git",
+      "prefix": "src/projects/SubtreeSync",
+      "branch": "main",
+      "split_branch": "SubtreeSync",
+      "added_time": "2025-04-22T10:58:43.745908",
+      "extra": {}
+    },
+    {
+      "name": "MangaClassify",
+      "remote": "https://github.com/HibernalGlow/MangaClassify.git",
+      "prefix": "src/projects/MangaClassify",
+      "branch": "main",
+      "split_branch": "MangaClassify",
+      "added_time": "2025-04-22T11:15:00.000000",
+      "extra": {}
+    },
+    {
+      "name": "OrganizeFolder",
+      "remote": "https://github.com/HibernalGlow/OrganizeFolder.git",
+      "prefix": "src/projects/OrganizeFolder",
+      "branch": "main",
+      "added_time": "2025-04-23T15:03:36.841006",
+      "extra": {}
+    }
+  ]
+}
