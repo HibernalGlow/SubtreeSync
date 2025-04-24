@@ -35,59 +35,7 @@ def print_help():
     help_text = """
 # SubtreeSync 使用帮助
 
-## 简介
 
-SubtreeSync 是一个 Git Subtree 管理工具，用于简化 Git Subtree 操作。
-
-## 命令
-
-### 添加子树
-
-```bash
-python subtree-sync.py add
-```
-
-交互式添加一个新的 Git Subtree。
-
-### 拉取更新
-
-```bash
-python subtree-sync.py pull [--name REPO_NAME]
-```
-
-拉取所有或指定仓库的更新。
-
-### 推送更新
-
-```bash
-python subtree-sync.py push [--name REPO_NAME]
-```
-
-推送本地更改到所有或指定的远程仓库。
-
-### 分离子树
-
-```bash
-python subtree-sync.py split [--name REPO_NAME]
-```
-
-将子树目录分离为独立分支，为推送做准备。
-
-### 列出子树
-
-```bash
-python subtree-sync.py list
-```
-
-列出所有已配置的 Git Subtree。
-
-## 选项
-
-- `--help`, `-h`: 显示帮助信息
-- `--version`, `-v`: 显示版本信息
-- `--yes`, `-y`: 自动确认所有操作
-- `--verbose`: 显示详细信息
-- `--interactive`, `-i`: 使用交互式菜单
 """
     md = Markdown(help_text)
     console.print(Panel(md, title="SubtreeSync 帮助", border_style="green"))
