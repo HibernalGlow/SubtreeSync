@@ -51,23 +51,8 @@
           "extra": {}
         }
       ]
-    },
-    {
-      "name": "AutoRepack",
-      "path": "D:\\1VSCODE\\Projects\\CompressAll\\AutoRepack",
-      "is_default": false,
-      "repos": [
-        {
-          "name": "PresetUI",
-          "remote": "https://github.com/HibernalGlow/PresetUI.git",
-          "prefix": "src/common/PresetUI",
-          "branch": "main",
-          "split_branch": "PresetUI#Sub",
-          "added_time": "2025-04-28T19:17:21.461625",
-          "extra": {}
-        }
-      ]
     }
+
   ],
-  "current_repository": "GlowToolBox"
+  "current_repository": ""
 }

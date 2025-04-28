@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subtreesync"
+version = "0.2.0"
+description = "Git Subtree 同步工具"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "HibernalGlow"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pyperclip>=1.9.0",
+    "rich>=14.0.0",
+    "GitPython>=3.1.0",
+]
+
+[tool.setuptools]
+packages = ["src"]
+py-modules = ["main"]
+
+[project.scripts]
+subtreesync = "main:main"
+
+[project.urls]
+"Homepage" = "https://github.com/HibernalGlow/SubtreeSync"
+"Bug Tracker" = "https://github.com/HibernalGlow/SubtreeSync/issues"
