@@ -56,7 +56,7 @@ def run_interactive_mode():
         if mode == "add":
             from src.add import add_subtree
             args = argparse.Namespace(remote=None, name=None, prefix=None, branch="main", 
-                                     yes=False, no_taskfile=False, interactive=True)
+                                     yes=False, interactive=True)
             result = add_subtree(args)
         elif mode == "pull":
             from src.pull import pull_all_subtrees, pull_subtree

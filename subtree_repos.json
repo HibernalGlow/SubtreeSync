@@ -24,30 +24,12 @@
           "extra": {}
         },
         {
-          "name": "AutoRepack",
-          "remote": "https://github.com/HibernalGlow/AutoRepack.git",
-          "prefix": "src/projects/AutoRepack",
-          "branch": "main",
-          "split_branch": "AutoRepack#Sub",
-          "added_time": "2025-04-22T11:15:00.000000",
-          "extra": {}
-        },
-        {
           "name": "TaskGui",
           "remote": "https://github.com/HibernalGlow/TaskGui.git",
           "prefix": "src/projects/TaskGui",
           "branch": "main",
           "split_branch": "TaskGui#Sub",
           "added_time": "2025-04-22T11:15:00.000000",
-          "extra": {}
-        },
-        {
-          "name": "SubtreeSync",
-          "remote": "https://github.com/HibernalGlow/SubtreeSync.git",
-          "prefix": "src/projects/SubtreeSync",
-          "branch": "main",
-          "split_branch": "SubtreeSync#Sub",
-          "added_time": "2025-04-22T10:58:43.745908",
           "extra": {}
         },
         {
@@ -87,5 +69,5 @@
       ]
     }
   ],
-  "current_repository": "AutoRepack"
+  "current_repository": "GlowToolBox"
 }
