@@ -27,48 +27,6 @@ from .utils import (
     get_repo, run_git_command_stream, run_command
 )
 
-def remove_from_taskfile(prefix: str) -> bool:
-    """
-    从Taskfile.yml中移除subtree配置
-    
-    Args:
-        prefix: 子树本地目录前缀
-        
-    Returns:
-        是否成功移除
-    """
-    import re
-    
-    taskfile_path = Path("Taskfile.yml")
-    if not taskfile_path.exists():
-        console.print(f"[bold red]错误:[/] 找不到Taskfile.yml文件")
-        return False
-    
-    try:
-        with open(taskfile_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # 定位包含指定prefix的行
-        subtree_pattern = r'([ \t]*-[ \t]*\{[ \t]*prefix:[ \t]*"' + re.escape(prefix) + r'",.*\}[ \t]*\n)'
-        match = re.search(subtree_pattern, content)
-        
-        if not match:
-            console.print(f"[bold yellow]警告:[/] 在Taskfile.yml中找不到前缀为 '{prefix}' 的子树")
-            return False
-        
-        # 移除匹配的行
-        updated_content = content.replace(match.group(1), '')
-        
-        with open(taskfile_path, 'w', encoding='utf-8') as f:
-            f.write(updated_content)
-        
-        console.print(f"已从Taskfile.yml中移除子树配置", style="green")
-        return True
-    
-    except Exception as e:
-        console.print(f"[bold red]更新Taskfile.yml时出错:[/] {str(e)}")
-        return False
-
 def remove_subtree(args=None) -> bool:
     """
     删除一个git subtree
@@ -131,6 +89,48 @@ def remove_subtree(args=None) -> bool:
                 repo.get("remote", "")
             )
         
+        console.print(table)
+        
+        # 让用户选择要删除的仓库
+        choice = None
+        while True:
+            choice = Prompt.ask(
+                "[bold cyan]请输入要删除的仓库序号[/] (输入q取消)",
+                default="q"
+            )
+            
+            if choice.lower() == 'q':
+                console.print("[yellow]操作已取消[/]")
+                return False
+            
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(repos):
+                    selected_repo = repos[idx]
+                    break
+                else:
+                    console.print("[bold red]错误:[/] 无效的序号，请重新输入")
+            except ValueError:
+                console.print("[bold red]错误:[/] 请输入有效的数字或q退出")
+    
+    # 显示将要删除的仓库信息
+    name = selected_repo.get("name", "")
+    prefix = selected_repo.get("prefix", "")
+    remote = selected_repo.get("remote", "")
+    branch = selected_repo.get("branch", "main")
+    
+    console.print(f"\n[bold]将要删除以下子树:[/]", style="yellow")
+    table = Table(show_header=False, box=None, pad_edge=False)
+    table.add_column("键", style="bold cyan")
+    table.add_column("值")
+    
+    table.add_row("仓库名", name)
+    table.add_row("本地路径", prefix)
+    table.add_row("远程地址", remote)
+    table.add_row("分支", branch)
+    
+    console.print(table)
+    
         console.print(table)
         
         # 让用户选择要删除的仓库

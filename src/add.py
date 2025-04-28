@@ -119,47 +119,6 @@ def select_existing_repo() -> Optional[Dict[str, str]]:
     
     return repos[choice - 1]
 
-def add_to_taskfile(prefix: str, remote: str, branch: str) -> bool:
-    """将新的subtree添加到Taskfile.yml配置中"""
-    import re
-    
-    taskfile_path = Path("Taskfile.yml")
-    if not taskfile_path.exists():
-        console.print(f"[bold red]错误:[/] 找不到Taskfile.yml文件")
-        return False
-    
-    try:
-        with open(taskfile_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # 定位SUBTREES部分
-        subtrees_pattern = r'(SUBTREES:\s*)((?:[ \t]*-.*\n)*)'
-        match = re.search(subtrees_pattern, content)
-        
-        if not match:
-            console.print("[bold red]错误:[/] 在Taskfile.yml中找不到SUBTREES部分")
-            return False
-        
-        # 准备新的条目
-        new_entry = f'    - {{ prefix: "{prefix}", remote: "{remote}", branch: "{branch}" }}\n'
-        
-        # 插入新条目
-        existing_subtrees = match.group(2)
-        updated_subtrees = match.group(1) + existing_subtrees + new_entry
-        
-        # 更新文件内容
-        updated_content = content.replace(match.group(0), updated_subtrees)
-        
-        with open(taskfile_path, 'w', encoding='utf-8') as f:
-            f.write(updated_content)
-        
-        console.print(f"已将新subtree添加到Taskfile.yml", style="green")
-        return True
-    
-    except Exception as e:
-        console.print(f"[bold red]更新Taskfile.yml时出错:[/] {str(e)}")
-        return False
-
 def add_subtree(args=None) -> bool:
     """交互式添加git subtree (使用 GitPython)"""
     print("\n--- Git Subtree 添加工具 ---")
@@ -297,14 +256,6 @@ def add_subtree(args=None) -> bool:
         if save_subtree_repo(repo_info):
             console.print("[green]已保存仓库配置到本地[/]")
         
-        # 询问是否添加到Taskfile.yml
-        if not args or not args.no_taskfile:
-            add_to_taskfile_flag = True
-            if not args or not args.yes:
-                add_to_taskfile_flag = Confirm.ask("\n是否将此subtree添加到Taskfile.yml?", default=True)
-            if add_to_taskfile_flag:
-                add_to_taskfile(prefix, remote, branch)
-        
         return True
     else:
         console.print("[bold red]Subtree添加失败:[/]")
@@ -336,14 +287,6 @@ def add_subtree(args=None) -> bool:
                         
                         if save_subtree_repo(repo_info):
                             console.print("[green]已保存仓库配置到本地[/]")
-                        
-                        # 询问是否添加到Taskfile.yml
-                        if not args or not args.no_taskfile:
-                            add_to_taskfile_flag = True
-                            if not args or not args.yes:
-                                add_to_taskfile_flag = Confirm.ask("\n是否将此subtree添加到Taskfile.yml?", default=True)
-                            if add_to_taskfile_flag:
-                                add_to_taskfile(prefix, remote, branch)
                         
                         return True
                     else:
