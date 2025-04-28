@@ -131,60 +131,15 @@ def remove_subtree(args=None) -> bool:
     
     console.print(table)
     
-        console.print(table)
-        
-        # 让用户选择要删除的仓库
-        choice = None
-        while True:
-            choice = Prompt.ask(
-                "[bold cyan]请输入要删除的仓库序号[/] (输入q取消)",
-                default="q"
-            )
-            
-            if choice.lower() == 'q':
-                console.print("[yellow]操作已取消[/]")
-                return False
-            
-            try:
-                idx = int(choice) - 1
-                if 0 <= idx < len(repos):
-                    selected_repo = repos[idx]
-                    break
-                else:
-                    console.print("[bold red]错误:[/] 无效的序号，请重新输入")
-            except ValueError:
-                console.print("[bold red]错误:[/] 请输入有效的数字或q退出")
-    
-    # 显示将要删除的仓库信息
-    name = selected_repo.get("name", "")
-    prefix = selected_repo.get("prefix", "")
-    remote = selected_repo.get("remote", "")
-    branch = selected_repo.get("branch", "main")
-    
-    console.print(f"\n[bold]将要删除以下子树:[/]", style="yellow")
-    table = Table(show_header=False, box=None, pad_edge=False)
-    table.add_column("键", style="bold cyan")
-    table.add_column("值")
-    
-    table.add_row("仓库名", name)
-    table.add_row("本地路径", prefix)
-    table.add_row("远程地址", remote)
-    table.add_row("分支", branch)
-    
-    console.print(table)
-    
     # 确认用户想要删除的内容
     delete_config_only = False
     delete_files = False
-    delete_taskfile = False
     
     console.print("\n[bold cyan]请选择删除操作:[/]")
     delete_config_only = Confirm.ask("仅从配置文件中移除？(不删除实际文件)", default=False)
     
     if not delete_config_only:
         delete_files = Confirm.ask("同时删除本地文件？", default=True)
-    
-    delete_taskfile = Confirm.ask("从Taskfile.yml中移除配置？", default=True)
     
     # 最终确认
     console.print("\n[bold red]警告：此操作不可逆！[/]")
@@ -201,15 +156,7 @@ def remove_subtree(args=None) -> bool:
         console.print(f"[bold red]从配置文件删除仓库 '{name}' 失败[/]")
         success = False
     
-    # 2. 从Taskfile.yml中移除
-    if delete_taskfile:
-        if remove_from_taskfile(prefix):
-            console.print(f"[green]已从Taskfile.yml中移除子树配置[/]")
-        else:
-            console.print(f"[bold yellow]从Taskfile.yml移除配置失败，可能需要手动移除[/]")
-            success = False
-    
-    # 3. 删除本地文件
+    # 2. 删除本地文件
     if delete_files:
         prefix_path = Path(prefix)
         if prefix_path.exists():
@@ -310,7 +257,6 @@ def remove_all_subtrees(args=None) -> bool:
     
     # 询问是否删除文件
     delete_files = Confirm.ask("是否同时删除本地文件?", default=False)
-    delete_taskfile = Confirm.ask("是否从Taskfile.yml中移除所有配置?", default=False)
     
     for repo in repos:
         name = repo.get("name", "")
@@ -325,14 +271,7 @@ def remove_all_subtrees(args=None) -> bool:
         else:
             console.print(f"[bold red]从配置文件删除仓库 '{name}' 失败[/]")
         
-        # 2. 从Taskfile.yml中移除
-        if delete_taskfile:
-            if remove_from_taskfile(prefix):
-                console.print(f"[green]已从Taskfile.yml中移除子树配置[/]")
-            else:
-                console.print(f"[bold yellow]从Taskfile.yml移除配置失败，可能需要手动移除[/]")
-        
-        # 3. 删除本地文件
+        # 2. 删除本地文件
         if delete_files:
             prefix_path = Path(prefix)
             if prefix_path.exists():
@@ -347,6 +286,8 @@ def remove_all_subtrees(args=None) -> bool:
                         console.print(f"[green]已删除本地目录: {prefix}[/]")
                     else:
                         console.print(f"[bold red]安全检查失败！路径 '{prefix}' 不安全，无法删除。[/]")
+                        fail_count += 1
+                        continue
                 except Exception as e:
                     console.print(f"[bold red]删除本地文件时出错:[/] {str(e)}")
                     fail_count += 1

@@ -199,7 +199,6 @@ def main():
     add_parser.add_argument("--prefix", help="本地目录前缀")
     add_parser.add_argument("--branch", default="main", help="分支名称，默认为 main")
     add_parser.add_argument("--yes", "-y", action="store_true", help="自动确认所有操作")
-    add_parser.add_argument("--no-taskfile", action="store_true", help="不添加到 Taskfile.yml")
     add_parser.add_argument("--interactive", "-i", action="store_true", help="使用交互式菜单")
     
     # pull 命令
@@ -229,7 +228,6 @@ def main():
     remove_parser.add_argument("--name", help="要删除的仓库名称")
     remove_parser.add_argument("--yes", "-y", action="store_true", help="自动确认所有操作")
     remove_parser.add_argument("--no-files", action="store_true", help="不删除本地文件")
-    remove_parser.add_argument("--no-taskfile", action="store_true", help="不从Taskfile.yml中移除")
     remove_parser.add_argument("--batch", action="store_true", help="批量删除模式(危险)")
     remove_parser.add_argument("--interactive", "-i", action="store_true", help="使用交互式菜单")
     
