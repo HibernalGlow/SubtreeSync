@@ -220,7 +220,7 @@ def add_subtree(args=None) -> bool:
                 return False
             
             # 自动构建本地目录前缀
-            suggested_prefix = f"src/projects/{repo_name}"
+            suggested_prefix = f"src/common/{repo_name}"  # Corrected to use .lower() method
             
             # 输入本地前缀
             prefix = Prompt.ask(

@@ -86,6 +86,7 @@ def select_repository() -> bool:
         是否成功选择仓库
     """
     from src.utils import load_all_repositories, get_current_repository_name, set_current_repository
+    import os
     
     repositories = load_all_repositories()
     
@@ -122,8 +123,20 @@ def select_repository() -> bool:
     if choice == 0:  # 选择仓库
         repo = select_from_list("请选择要操作的仓库", repositories, lambda r: f"{r.get('name')} ({r.get('path')})")
         if repo:
+            repo_path = repo.get("path", ".")
             set_current_repository(repo.get("name"))
             console.print(f"[bold green]已切换到仓库:[/] {repo.get('name')}")
+            
+            # 自动切换到仓库路径
+            if os.path.exists(repo_path):
+                try:
+                    os.chdir(repo_path)
+                    console.print(f"[bold green]已切换工作目录到:[/] {repo_path}")
+                except Exception as e:
+                    console.print(f"[bold yellow]警告: 无法切换到仓库目录:[/] {str(e)}")
+            else:
+                console.print(f"[bold yellow]警告: 仓库路径不存在:[/] {repo_path}")
+            
             return True
     
     elif choice == 1:  # 添加新仓库

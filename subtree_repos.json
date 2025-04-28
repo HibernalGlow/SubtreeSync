@@ -74,7 +74,17 @@
       "name": "AutoRepack",
       "path": "D:\\1VSCODE\\Projects\\CompressAll\\AutoRepack",
       "is_default": false,
-      "repos": []
+      "repos": [
+        {
+          "name": "PresetUI",
+          "remote": "https://github.com/HibernalGlow/PresetUI.git",
+          "prefix": "src/commom/PresetUI",
+          "branch": "main",
+          "split_branch": "PresetUI#Sub",
+          "added_time": "2025-04-28T19:12:23.838994",
+          "extra": {}
+        }
+      ]
     }
   ],
   "current_repository": "AutoRepack"
