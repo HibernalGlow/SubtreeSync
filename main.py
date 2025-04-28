@@ -158,6 +158,12 @@ def run_interactive_mode():
                     sub_result = split_subtree(argparse.Namespace(**args_dict), repo)
                     if not sub_result:
                         result = False
+        
+        elif mode == "remove":
+            # 添加删除子树功能的处理
+            from src.remove import remove_subtree
+            args = argparse.Namespace(name=None, yes=False, interactive=True)
+            result = remove_subtree(args)
                         
         elif mode == "list":
             from src.list import list_subtrees
@@ -215,6 +221,15 @@ def main():
     split_parser.add_argument("--yes", "-y", action="store_true", help="自动确认所有操作")
     split_parser.add_argument("--interactive", "-i", action="store_true", help="使用交互式菜单")
     
+    # remove 命令
+    remove_parser = subparsers.add_parser("remove", help="删除子树")
+    remove_parser.add_argument("--name", help="要删除的仓库名称")
+    remove_parser.add_argument("--yes", "-y", action="store_true", help="自动确认所有操作")
+    remove_parser.add_argument("--no-files", action="store_true", help="不删除本地文件")
+    remove_parser.add_argument("--no-taskfile", action="store_true", help="不从Taskfile.yml中移除")
+    remove_parser.add_argument("--batch", action="store_true", help="批量删除模式(危险)")
+    remove_parser.add_argument("--interactive", "-i", action="store_true", help="使用交互式菜单")
+    
     # list 命令
     list_parser = subparsers.add_parser("list", help="列出所有子树")
     list_parser.add_argument("--verbose", action="store_true", help="显示详细信息")
@@ -251,6 +266,16 @@ def main():
     elif args.command == "split":
         from src.split import split_all_subtrees
         result = split_all_subtrees(args)
+    elif args.command == "remove":
+        # 处理删除命令
+        if args.batch:
+            # 批量删除模式
+            from src.remove import remove_all_subtrees
+            result = remove_all_subtrees(args)
+        else:
+            # 单个删除模式
+            from src.remove import remove_subtree
+            result = remove_subtree(args)
     elif args.command == "list":
         from src.list import list_subtrees
         result = list_subtrees(args)

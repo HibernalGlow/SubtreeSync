@@ -23,8 +23,7 @@ from .console import console  # 导入共享的控制台实例
 from .interactive import confirm_action
 from .utils import load_subtree_repos, find_repo_by_name, run_command
 from .split import (
-    split_subtree, check_branch_for_prefix, 
-    get_split_branch_name, run_git_command  # 复用split.py中的函数
+    split_subtree, run_git_command  # 复用split.py中的函数
 )
 
 def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
@@ -51,34 +50,49 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     remote = repo_info.get("remote", "")
     prefix = repo_info.get("prefix", "")
     branch = repo_info.get("branch", "main")
+    # 获取固定的 split_branch 名称
+    split_branch = repo_info.get("split_branch") 
     
-    console.print(f"\n将 {prefix} 的更改推送到 {name}")
+    if not split_branch:
+        console.print(f"[bold red]错误:[/] 仓库 '{name}' 的配置中缺少 'split_branch' 定义")
+        return False
+
+    console.print(f"\n将 {prefix} 的更改推送到 {name} (远程分支: {branch}, 使用 split 分支: {split_branch})")
     
-    # 检查是否需要先执行split操作
-    check_split = getattr(args, "check_split", True) if args else True
-    if check_split:
-        has_branch, branch_name = check_branch_for_prefix(".", prefix, name)
-        if not has_branch:
-            console.print(f"[yellow]提示:[/] 检测到{prefix}可能没有对应的split分支，需要先执行split操作")
-            if not args or not getattr(args, "yes", False):
-                if not Confirm.ask("是否先执行split操作?"):
-                    console.print("[yellow]操作已取消[/]")
-                    return False
-            
-            # 执行split操作
-            if not split_subtree(args, repo_info):
-                console.print("[bold red]Split操作失败，无法继续推送[/]")
-                return False
-            else:
-                console.print("[bold green]Split操作完成，准备推送...[/]")
+    # 检查是否需要先执行split操作 (默认为 True)
+    # 询问用户是否需要先执行 split 操作
+    perform_split = False
+    if not args or not getattr(args, "yes", False): # 如果不是自动确认模式
+        perform_split = Confirm.ask(
+            f"\n是否在推送前执行 split 操作以更新本地分支 '{split_branch}'?",
+            default=False # 默认不执行
+        )
+    elif getattr(args, "force_split", False): # 兼容旧的 force_split 参数，如果存在且为True，则执行
+        perform_split = True
+        console.print("[yellow]检测到 --force-split 参数，将执行 split 操作...[/]")
+
+
+    if perform_split:
+        console.print(f"[yellow]准备执行 split 操作以更新分支 {split_branch}...[/]")
+        # 执行split操作，使用固定的分支名
+        if not split_subtree(args, repo_info):
+            console.print("[bold red]Split 操作失败，无法继续推送[/]")
+            return False
         else:
-            # 如果用户明确要求执行split，即使已有分支也执行
-            if getattr(args, "force_split", False):
-                console.print("[yellow]强制执行split操作...[/]")
-                split_subtree(args, repo_info)
+            console.print(f"[bold green]Split 操作完成，分支 {split_branch} 已更新，准备推送...[/]")
+    else:
+         console.print(f"[yellow]跳过 split 操作，将直接尝试推送分支 {split_branch}[/]")
+
 
     # 构建 git subtree push 命令列表
-    cmd_list = ["subtree", "push", f"--prefix={prefix}", name, branch]
+    # 命令格式: git subtree push --prefix=<prefix> <remote_repository> <local_split_branch>:<remote_target_branch>
+    # 注意：subtree push 不直接使用 --prefix，而是通过 split 分支来推送
+    # 正确的命令应该是: git push <remote_repository> <local_split_branch>:<remote_target_branch>
+    # 或者是 git subtree push <remote_name_in_git_config> <local_split_branch>:<remote_target_branch>
+    # 但更常见且推荐的是直接用 git push 推送 split 出来的分支
+    
+    # 使用 git push 推送 split 分支
+    cmd_list = ["push", remote, f"{split_branch}:{branch}"]
 
     # 显示完整命令
     cmd_str = " ".join(['git'] + cmd_list)
@@ -86,18 +100,17 @@ def push_subtree(args=None, repo_info: Dict[str, Any] = None) -> bool:
     console.print(cmd_str)
     console.print("[bold yellow]---------------------[/]")
 
-    # 执行命令，使用直接执行方法不捕获输出
+    # 执行命令
     from .utils import run_git_command_direct
     success = run_git_command_direct(cmd_list)
 
     if success:
-        console.print(f"\n[bold green]成功将 {prefix} 的更改推送到 {name}![/]")
+        console.print(f"\n[bold green]成功将 {split_branch} 推送到 {remote} 的 {branch} 分支![/]")
         return True
     else:
-        console.print(f"\n[bold red]推送 {prefix} 的更改到 {name} 失败[/]")
+        console.print(f"\n[bold red]推送 {split_branch} 到 {remote} 的 {branch} 分支失败[/]")
         console.print("[yellow]提示:[/] 如果是权限问题，请确认是否有远程仓库的写入权限")
-        console.print("      如果是冲突问题，可能需要先拉取远程更新")
-        console.print("      如果看到'找不到远程ref对应的本地ref'错误，可能需要重新执行split操作，使用--force-split参数")
+        console.print("      如果是冲突问题(non-fast-forward)，可能需要先拉取远程更新到主仓库，然后重新 split 和 push")
         return False
 
 def push_all_subtrees(args=None) -> bool:
@@ -140,12 +153,14 @@ def push_all_subtrees(args=None) -> bool:
     
     for i, repo in enumerate(repos):
         repo_name = repo.get("name", "")
+        # 从 repo_info 获取 split_branch
+        split_branch = repo.get("split_branch", "[未定义]") 
         table.add_row(
             str(i + 1),
             repo_name,
             repo.get("remote", ""),
             repo.get("branch", "main"),
-            get_split_branch_name(repo_name),
+            split_branch, # 显示固定的 split_branch
             repo.get("prefix", "")
         )
     
