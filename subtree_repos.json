@@ -69,7 +69,13 @@
           "extra": {}
         }
       ]
+    },
+    {
+      "name": "AutoRepack",
+      "path": "D:\\1VSCODE\\Projects\\CompressAll\\AutoRepack",
+      "is_default": false,
+      "repos": []
     }
   ],
-  "current_repository": "GlowToolBox"
+  "current_repository": "AutoRepack"
 }

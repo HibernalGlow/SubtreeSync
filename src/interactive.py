@@ -153,13 +153,13 @@ def add_repository() -> bool:
     """
     from src.utils import add_repository as utils_add_repository
     import os
-    
-    repo_name = Prompt.ask("请输入仓库名称", console=console)
+    repo_path = Prompt.ask("请输入仓库路径", console=console, default=os.getcwd())
+
+    repo_name = repo_path.split(os.sep)[-1]  # 默认仓库名称为路径的最后一部分
     if not repo_name.strip():
         console.print("[bold red]错误:[/] 仓库名称不能为空")
         return False
     
-    repo_path = Prompt.ask("请输入仓库路径", console=console, default=os.getcwd())
     
     # 验证路径是否存在
     if not os.path.exists(repo_path):
