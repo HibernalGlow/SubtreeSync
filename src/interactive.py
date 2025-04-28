@@ -78,6 +78,118 @@ def select_from_list(title: str, items: List[T], display_func: Callable[[T], str
     
     return items[choice_idx]
 
+def select_repository() -> bool:
+    """
+    选择要操作的仓库
+    
+    Returns:
+        是否成功选择仓库
+    """
+    from src.utils import load_all_repositories, get_current_repository_name, set_current_repository
+    
+    repositories = load_all_repositories()
+    
+    if not repositories:
+        console.print("[bold yellow]警告:[/] 没有配置的仓库")
+        if Confirm.ask("是否创建新的仓库配置?", console=console):
+            return add_repository()
+        return False
+    
+    # 获取当前仓库名称
+    current_repo_name = get_current_repository_name()
+    
+    # 创建仓库选择表格
+    table = Table(title="可用的仓库")
+    table.add_column("序号", style="cyan", justify="right")
+    table.add_column("仓库名称", style="green")
+    table.add_column("路径", style="blue")
+    table.add_column("状态", style="magenta")
+    
+    for i, repo in enumerate(repositories, 1):
+        name = repo.get("name", "无名称")
+        path = repo.get("path", ".")
+        status = "[green]当前[/]" if name == current_repo_name else ""
+        if repo.get("is_default", False):
+            status += " [cyan](默认)[/]"
+        
+        table.add_row(f"{i}", name, path, status)
+    
+    console.print(table)
+    
+    options = ["选择仓库", "添加新仓库", "设置默认仓库", "返回"]
+    choice = show_menu("仓库操作", options)
+    
+    if choice == 0:  # 选择仓库
+        repo = select_from_list("请选择要操作的仓库", repositories, lambda r: f"{r.get('name')} ({r.get('path')})")
+        if repo:
+            set_current_repository(repo.get("name"))
+            console.print(f"[bold green]已切换到仓库:[/] {repo.get('name')}")
+            return True
+    
+    elif choice == 1:  # 添加新仓库
+        return add_repository()
+    
+    elif choice == 2:  # 设置默认仓库
+        repo = select_from_list("请选择要设为默认的仓库", repositories, lambda r: f"{r.get('name')} ({r.get('path')})")
+        if repo:
+            # 更新配置，将所选仓库设为默认
+            from src.utils import load_config, save_config
+            config = load_config()
+            for r in config.get("repositories", []):
+                r["is_default"] = (r.get("name") == repo.get("name"))
+            
+            if save_config(config):
+                console.print(f"[bold green]已将 {repo.get('name')} 设为默认仓库[/]")
+                return True
+    
+    return False
+
+def add_repository() -> bool:
+    """
+    添加新的仓库配置
+    
+    Returns:
+        是否成功添加
+    """
+    from src.utils import add_repository as utils_add_repository
+    import os
+    
+    repo_name = Prompt.ask("请输入仓库名称", console=console)
+    if not repo_name.strip():
+        console.print("[bold red]错误:[/] 仓库名称不能为空")
+        return False
+    
+    repo_path = Prompt.ask("请输入仓库路径", console=console, default=os.getcwd())
+    
+    # 验证路径是否存在
+    if not os.path.exists(repo_path):
+        console.print(f"[bold yellow]警告:[/] 路径 {repo_path} 不存在")
+        if not Confirm.ask("路径不存在，是否继续?", console=console):
+            return False
+    
+    # 创建仓库配置
+    repo_info = {
+        "name": repo_name,
+        "path": repo_path,
+        "is_default": False,
+        "repos": []
+    }
+    
+    # 添加到配置
+    if utils_add_repository(repo_info):
+        console.print(f"[bold green]仓库 {repo_name} 添加成功[/]")
+        
+        # 询问是否设为当前仓库
+        if Confirm.ask("是否将此仓库设为当前操作仓库?", console=console, default=True):
+            from src.utils import set_current_repository
+            set_current_repository(repo_name)
+            console.print(f"[bold green]已将 {repo_name} 设为当前仓库[/]")
+        
+        return True
+    else:
+        console.print("[bold red]仓库添加失败[/]")
+        return False
+
 def select_mode() -> Optional[str]:
     """
     选择操作模式

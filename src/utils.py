@@ -41,19 +41,95 @@ def ensure_config_exists():
     config_path = get_config_path()
     if not config_path.exists():
         config_path.parent.mkdir(parents=True, exist_ok=True)
+        # 初始化多仓库配置结构
         with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump({"repos": []}, f, ensure_ascii=False, indent=2)
+            json.dump({"repositories": [], "current_repository": None}, f, ensure_ascii=False, indent=2)
 
-def load_subtree_repos() -> List[Dict[str, Any]]:
-    """加载已保存的subtree仓库配置"""
+def load_config() -> Dict[str, Any]:
+    """加载配置文件"""
     ensure_config_exists()
     try:
         with open(get_config_path(), 'r', encoding='utf-8') as f:
             config = json.load(f)
-            return config.get("repos", [])
+            # 确保新的配置格式存在
+            if "repositories" not in config:
+                # 兼容旧格式，创建新格式
+                if "repos" in config:
+                    # 将旧格式转换为新格式
+                    config = {
+                        "repositories": [
+                            {
+                                "name": "Default",
+                                "path": ".",
+                                "is_default": True,
+                                "repos": config.get("repos", [])
+                            }
+                        ],
+                        "current_repository": "Default"
+                    }
+                else:
+                    # 创建空的新格式
+                    config = {"repositories": [], "current_repository": None}
+            return config
     except Exception as e:
         console.print(f"[bold red]读取配置文件失败:[/] {str(e)}")
+        return {"repositories": [], "current_repository": None}
+
+def save_config(config: Dict[str, Any]) -> bool:
+    """保存配置文件"""
+    try:
+        with open(get_config_path(), 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        console.print(f"[bold red]保存配置文件失败:[/] {str(e)}")
+        return False
+
+def load_all_repositories() -> List[Dict[str, Any]]:
+    """加载所有仓库配置"""
+    config = load_config()
+    return config.get("repositories", [])
+
+def get_current_repository_name() -> Optional[str]:
+    """获取当前选中的仓库名称"""
+    config = load_config()
+    return config.get("current_repository")
+
+def get_default_repository() -> Optional[Dict[str, Any]]:
+    """获取默认的仓库配置"""
+    repositories = load_all_repositories()
+    for repo in repositories:
+        if repo.get("is_default", False):
+            return repo
+    return repositories[0] if repositories else None
+
+def get_current_repository() -> Optional[Dict[str, Any]]:
+    """获取当前选中的仓库配置"""
+    current_name = get_current_repository_name()
+    if not current_name:
+        return get_default_repository()
+        
+    repositories = load_all_repositories()
+    for repo in repositories:
+        if repo.get("name") == current_name:
+            return repo
+    
+    # 如果当前仓库不存在，返回默认仓库
+    return get_default_repository()
+
+def set_current_repository(name: str) -> bool:
+    """设置当前选中的仓库"""
+    config = load_config()
+    config["current_repository"] = name
+    return save_config(config)
+
+def load_subtree_repos() -> List[Dict[str, Any]]:
+    """加载当前仓库的子树配置"""
+    repo = get_current_repository()
+    if not repo:
+        console.print("[bold yellow]警告:[/] 未设置当前仓库或无仓库配置")
         return []
+    return repo.get("repos", [])
 
 def find_repo_by_name(name: str) -> Optional[Dict[str, Any]]:
     """
@@ -73,7 +149,7 @@ def find_repo_by_name(name: str) -> Optional[Dict[str, Any]]:
 
 def delete_subtree_repo(name: str) -> bool:
     """
-    删除subtree仓库配置
+    从当前仓库配置中删除subtree仓库配置
     
     Args:
         name: 仓库名称
@@ -81,7 +157,12 @@ def delete_subtree_repo(name: str) -> bool:
     Returns:
         是否成功删除
     """
-    repos = load_subtree_repos()
+    current_repo = get_current_repository()
+    if not current_repo:
+        console.print("[bold red]错误:[/] 未设置当前仓库")
+        return False
+    
+    repos = current_repo.get("repos", [])
     initial_count = len(repos)
     
     # 过滤掉要删除的仓库
@@ -91,17 +172,26 @@ def delete_subtree_repo(name: str) -> bool:
         # 没有找到要删除的仓库
         return False
     
-    try:
-        with open(get_config_path(), 'w', encoding='utf-8') as f:
-            json.dump({"repos": repos}, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        console.print(f"[bold red]保存配置文件失败:[/] {str(e)}")
-        return False
+    # 更新当前仓库的子树列表
+    current_repo["repos"] = repos
+    
+    # 更新整体配置
+    config = load_config()
+    for i, repo in enumerate(config.get("repositories", [])):
+        if repo.get("name") == current_repo.get("name"):
+            config["repositories"][i] = current_repo
+            break
+    
+    return save_config(config)
 
 def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
-    """保存subtree仓库配置"""
-    repos = load_subtree_repos()
+    """保存subtree仓库配置到当前选中的仓库中"""
+    current_repo = get_current_repository()
+    if not current_repo:
+        console.print("[bold red]错误:[/] 未设置当前仓库")
+        return False
+    
+    repos = current_repo.get("repos", [])
     
     # 检查是否已存在
     for i, repo in enumerate(repos):
@@ -113,13 +203,41 @@ def save_subtree_repo(repo_info: Dict[str, str]) -> bool:
         # 添加新配置
         repos.append(repo_info)
     
-    try:
-        with open(get_config_path(), 'w', encoding='utf-8') as f:
-            json.dump({"repos": repos}, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        console.print(f"[bold red]保存配置文件失败:[/] {str(e)}")
-        return False
+    # 更新当前仓库的子树列表
+    current_repo["repos"] = repos
+    
+    # 更新整体配置
+    config = load_config()
+    for i, repo in enumerate(config.get("repositories", [])):
+        if repo.get("name") == current_repo.get("name"):
+            config["repositories"][i] = current_repo
+            break
+    
+    return save_config(config)
+
+def add_repository(repo_info: Dict[str, Any]) -> bool:
+    """添加或更新仓库配置"""
+    config = load_config()
+    repositories = config.get("repositories", [])
+    
+    # 检查是否已存在
+    for i, repo in enumerate(repositories):
+        if repo.get("name") == repo_info["name"]:
+            # 更新已存在的配置
+            repositories[i] = repo_info
+            break
+    else:
+        # 添加新配置
+        repositories.append(repo_info)
+    
+    config["repositories"] = repositories
+    
+    # 如果只有一个仓库，设为默认和当前仓库
+    if len(repositories) == 1:
+        repositories[0]["is_default"] = True
+        config["current_repository"] = repositories[0]["name"]
+    
+    return save_config(config)
 
 def run_command(cmd: List[str], show_command: bool = True) -> Tuple[bool, str]:
     """

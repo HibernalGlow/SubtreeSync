@@ -17,7 +17,7 @@ except ImportError:
     sys.exit(1)
 
 from .utils import (
-    console, load_subtree_repos
+    console, load_subtree_repos, get_current_repository, get_default_repository, load_all_repositories
 )
 
 def list_subtrees(args=None) -> bool:
@@ -26,21 +26,35 @@ def list_subtrees(args=None) -> bool:
     :param args: 命令行参数
     :return: 操作是否成功
     """
-    console.print(Panel.fit("[bold green]Git Subtree 仓库列表", 
-                           border_style="green", 
-                           title="GlowToolBox", 
-                           subtitle="v1.0"))
+    # 获取当前仓库信息
+    current_repo = get_current_repository()
     
-    # 加载所有仓库配置
+    if not current_repo:
+        console.print("[bold yellow]警告:[/] 未找到有效的仓库配置")
+        console.print("[cyan]提示:[/] 请先添加仓库配置")
+        return True
+    
+    # 显示仓库标题
+    repo_name = current_repo.get("name", "未命名仓库")
+    repo_path = current_repo.get("path", "未知路径")
+    
+    console.print(Panel.fit(
+        f"[bold green]Git Subtree 仓库列表 - {repo_name}[/]\n[dim]{repo_path}[/]", 
+        border_style="green", 
+        title=f"SubtreeSync",
+        subtitle="v1.0")
+    )
+    
+    # 加载当前仓库的子树配置
     repos = load_subtree_repos()
     
     if not repos:
-        console.print("[bold yellow]没有找到已配置的subtree仓库[/]")
+        console.print(f"[bold yellow]仓库 {repo_name} 中没有找到已配置的subtree项目[/]")
         console.print("[cyan]提示:[/] 请先使用 'subtree-sync add' 命令添加subtree仓库")
         return True
     
     # 显示所有仓库信息
-    console.print(f"\n[bold]已配置的subtree仓库 ({len(repos)}个):[/]")
+    console.print(f"\n[bold]已配置的subtree项目 ({len(repos)}个):[/]")
     
     table = Table(show_header=True)
     table.add_column("#", style="dim")
@@ -86,5 +100,30 @@ def list_subtrees(args=None) -> bool:
             console.print(Panel("\n".join(panel_content), 
                               title=f"仓库详情 - {repo.get('name', '')}", 
                               border_style="blue"))
+    
+    # 显示所有可用仓库的列表
+    if args and args.verbose:
+        console.print("\n[bold]所有可用仓库:[/]")
+        available_repos = load_all_repositories()
+        repo_table = Table(show_header=True)
+        repo_table.add_column("仓库名", style="cyan")
+        repo_table.add_column("路径", style="green")
+        repo_table.add_column("状态", style="yellow")
+        
+        for repo in available_repos:
+            name = repo.get("name", "无名称")
+            path = repo.get("path", ".")
+            status = []
+            
+            if repo.get("name") == current_repo.get("name"):
+                status.append("[green]当前[/]")
+            if repo.get("is_default", False):
+                status.append("[cyan]默认[/]")
+                
+            status_str = ", ".join(status) if status else ""
+            
+            repo_table.add_row(name, path, status_str)
+        
+        console.print(repo_table)
     
     return True

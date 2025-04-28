@@ -42,8 +42,11 @@ def print_help():
 
 def run_interactive_mode():
     """运行交互式模式"""
-    from src.interactive import select_mode, select_repo, confirm_action, show_operation_result, select_repos_for_action
+    from src.interactive import select_mode, select_repo, confirm_action, show_operation_result, select_repos_for_action, select_repository
     from src.utils import load_subtree_repos
+    
+    # 先进行仓库选择
+    select_repository()
     
     while True:
         mode = select_mode()
