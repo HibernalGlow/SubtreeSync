@@ -6,38 +6,11 @@
       "is_default": true,
       "repos": [
         {
-          "name": "PsdConvert",
-          "remote": "https://github.com/HibernalGlow/PsdConvert.git",
-          "prefix": "src/projects/PsdConvert",
-          "branch": "main",
-          "split_branch": "PsdConvert#Sub",
-          "added_time": "2025-04-22T11:15:00.000000",
-          "extra": {}
-        },
-        {
           "name": "PicsConvert",
           "remote": "https://github.com/HibernalGlow/PicsConvert.git",
           "prefix": "src/projects/PicsConvert",
           "branch": "main",
           "split_branch": "PicsConvert#Sub",
-          "added_time": "2025-04-22T11:15:00.000000",
-          "extra": {}
-        },
-        {
-          "name": "TaskGui",
-          "remote": "https://github.com/HibernalGlow/TaskGui.git",
-          "prefix": "src/projects/TaskGui",
-          "branch": "main",
-          "split_branch": "TaskGui#Sub",
-          "added_time": "2025-04-22T11:15:00.000000",
-          "extra": {}
-        },
-        {
-          "name": "MangaClassify",
-          "remote": "https://github.com/HibernalGlow/MangaClassify.git",
-          "prefix": "src/projects/MangaClassify",
-          "branch": "main",
-          "split_branch": "MangaClassify#Sub",
           "added_time": "2025-04-22T11:15:00.000000",
           "extra": {}
         },
@@ -52,7 +25,6 @@
         }
       ]
     }
-
   ],
-  "current_repository": ""
+  "current_repository": "GlowToolBox"
 }

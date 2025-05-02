@@ -29,7 +29,7 @@ py-modules = ["main"]
 
 [project.scripts]
 subtreesync = "main:main"
-sts = "main:main"
+stt = "main:main"
 
 [project.urls]
 "Homepage" = "https://github.com/HibernalGlow/SubtreeSync"
