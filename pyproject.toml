@@ -24,12 +24,11 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["src"]
-py-modules = ["main"]
+packages = ["subtreesync"]
 
 [project.scripts]
-subtreesync = "main:main"
-stt = "main:main"
+subtreesync = "subtreesync.__main__:main"
+stt = "subtreesync.__main__:main"
 
 [project.urls]
 "Homepage" = "https://github.com/HibernalGlow/SubtreeSync"

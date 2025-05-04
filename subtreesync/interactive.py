@@ -85,7 +85,7 @@ def select_repository() -> bool:
     Returns:
         是否成功选择仓库
     """
-    from src.utils import load_all_repositories, get_current_repository_name, set_current_repository
+    from subtreesync.utils import load_all_repositories, get_current_repository_name, set_current_repository
     import os
     
     repositories = load_all_repositories()
@@ -146,7 +146,7 @@ def select_repository() -> bool:
         repo = select_from_list("请选择要设为默认的仓库", repositories, lambda r: f"{r.get('name')} ({r.get('path')})")
         if repo:
             # 更新配置，将所选仓库设为默认
-            from src.utils import load_config, save_config
+            from subtreesync.utils import load_config, save_config
             config = load_config()
             for r in config.get("repositories", []):
                 r["is_default"] = (r.get("name") == repo.get("name"))
@@ -164,7 +164,7 @@ def add_repository() -> bool:
     Returns:
         是否成功添加
     """
-    from src.utils import add_repository as utils_add_repository
+    from subtreesync.utils import add_repository as utils_add_repository
     import os
     repo_path = Prompt.ask("请输入仓库路径", console=console, default=os.getcwd())
 
@@ -194,7 +194,7 @@ def add_repository() -> bool:
         
         # 询问是否设为当前仓库
         if Confirm.ask("是否将此仓库设为当前操作仓库?", console=console, default=True):
-            from src.utils import set_current_repository
+            from subtreesync.utils import set_current_repository
             set_current_repository(repo_name)
             console.print(f"[bold green]已将 {repo_name} 设为当前仓库[/]")
         
