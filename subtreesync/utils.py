@@ -29,7 +29,7 @@ console = Console()
 def get_config_dir() -> Path:
     """获取配置文件目录"""
     # 获取脚本所在的目录
-    script_dir = Path(__file__).resolve().parent.parent
+    script_dir = Path(__file__).resolve().parent
     return script_dir
 
 def get_config_path() -> Path:
